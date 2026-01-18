@@ -1,0 +1,5 @@
+.vscode/devhost-userdata
+.vscode/devhost-extensions
+node_modules/
+out/
+build/

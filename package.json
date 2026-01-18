@@ -1,0 +1,200 @@
+{
+  "name": "flixa",
+  "displayName": "Flixa",
+  "description": "AI-powered code implementation assistant",
+  "version": "0.0.1",
+  "publisher": "deniai",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Flixa",
+      "properties": {
+        "flixa.model": {
+          "type": "string",
+          "default": "openai/gpt-5.2-codex",
+          "enum": [
+            "openai/gpt-5.2-codex",
+            "openai/gpt-5.2",
+            "anthropic/claude-sonnet-4.5",
+            "glm-4.6",
+            "grok-code-fast-1",
+            "google/gemini-3-pro-preview",
+            "google/gemini-3-flash-preview"
+          ],
+          "description": "Model to use"
+        },
+        "flixa.agentApprovalMode": {
+          "type": "string",
+          "default": "SAFE_APPROVE",
+          "enum": [
+            "ALL_APPROVE",
+            "AUTO_APPROVE",
+            "SAFE_APPROVE",
+            "MANUAL_APPROVE"
+          ],
+          "enumDescriptions": [
+            "Execute all actions immediately without confirmation",
+            "AI safety check for shell commands, auto-execute others",
+            "User confirmation for shell commands, auto-execute others",
+            "User confirmation required for all actions"
+          ],
+          "description": "Approval mode for agent actions"
+        },
+        "flixa.autoContext.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable auto context feature to include workspace information in AI prompts"
+        },
+        "flixa.autoContext.includeFileList": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include file list in auto context"
+        },
+        "flixa.autoContext.includeGitStatus": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include git status in auto context"
+        },
+        "flixa.autoContext.includePackageInfo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include package.json info in auto context"
+        },
+        "flixa.autoContext.includeTsConfig": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include tsconfig.json info in auto context"
+        },
+        "flixa.autoContext.maxFileListDepth": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum depth for file list traversal"
+        },
+        "flixa.autoContext.maxFiles": {
+          "type": "number",
+          "default": 500,
+          "minimum": 10,
+          "maximum": 2000,
+          "description": "Maximum number of files to include in file list"
+        },
+        "flixa.autoContext.excludePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "node_modules",
+            ".git",
+            "dist",
+            "out",
+            "build",
+            ".next",
+            ".nuxt",
+            "coverage",
+            ".cache",
+            ".vscode",
+            ".idea",
+            "__pycache__",
+            ".pytest_cache",
+            "*.log",
+            "*.lock",
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "bun.lockb"
+          ],
+          "description": "Patterns to exclude from file list"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "flixa.implementComment",
+        "title": "Flixa: Implement Comment"
+      },
+      {
+        "command": "flixa.openChat",
+        "title": "Flixa: Open Chat"
+      },
+      {
+        "command": "flixa.applyDiff",
+        "title": "Flixa: Apply Diff"
+      },
+      {
+        "command": "flixa.inlineEdit",
+        "title": "Flixa: Inline Edit"
+      },
+      {
+        "command": "flixa.toggleAgentMode",
+        "title": "Flixa: Toggle Agent Mode"
+      },
+      {
+        "command": "flixa.setApprovalMode",
+        "title": "Flixa: Set Approval Mode"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "flixa.inlineEdit",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "when": "editorTextFocus"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "flixa-sidebar",
+          "title": "Flixa",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "flixa-sidebar": [
+        {
+          "type": "webview",
+          "id": "flixa.chatView",
+          "name": "Chat"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "bun run compile",
+    "compile": "cd webview-ui && npm run build && cd .. && tsc -p ./",
+    "build:webview": "cd webview-ui && npm run build",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.2",
+    "@ai-sdk/openai": "^3.0.2",
+    "@anthropic-ai/sdk": "^0.71.2",
+    "ai": "^6.0.5",
+    "oxfmt": "^0.24.0",
+    "zod": "^4.3.4"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.6",
+    "@types/json-schema": "^7.0.15",
+    "@types/node": "^25.0.3",
+    "@types/vscode": "1.85.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.3"
+  }
+}
