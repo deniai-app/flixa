@@ -178,8 +178,27 @@ export function buildImplementPrompt(
   filePath: string,
   languageId: string,
   commentPayload: string,
-  fullFileText: string
+  fullFileText: string,
+  scopeRange?: { startLine: number; endLine: number },
+  scopeText?: string
 ): string {
+  const hasSelection = scopeText && scopeText !== fullFileText;
+  
+  if (hasSelection && scopeRange) {
+    return `File: ${filePath}
+Language: ${languageId}
+
+User request: ${commentPayload}
+
+The user has selected lines ${scopeRange.startLine + 1} to ${scopeRange.endLine + 1}.
+You MUST only modify the selected code below. Return ONLY the modified selected portion, not the entire file.
+
+Selected code (lines ${scopeRange.startLine + 1}-${scopeRange.endLine + 1}):
+${scopeText}
+
+Return ONLY the modified selected code:`;
+  }
+
   return `File: ${filePath}
 Language: ${languageId}
 

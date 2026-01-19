@@ -85,6 +85,8 @@ body {
 /* Markdown content styles */
 .markdown-content {
   line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .markdown-content p {

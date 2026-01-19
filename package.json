@@ -2,7 +2,7 @@
   "name": "flixa",
   "displayName": "Flixa",
   "description": "AI-powered code implementation assistant",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "deniai",
   "icon": "assets/flixa.png",
   "repository": {
@@ -14,8 +14,25 @@
   },
   "categories": [
     "AI",
+    "Programming Languages",
+    "Education",
+    "Machine Learning",
+    "Testing",
     "Chat",
     "Other"
+  ],
+  "keywords": [
+    "ai",
+    "chatgpt",
+    "claude",
+    "cline",
+    "codex",
+    "copilot",
+    "claude code",
+    "github",
+    "gpt",
+    "agent",
+    "coding"
   ],
   "activationEvents": [
     "onStartupFinished"

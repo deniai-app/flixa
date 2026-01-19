@@ -44,11 +44,15 @@ export async function callLLMForImplement(
 	const anthropic = getAnthropicProvider();
 	const model = getModel();
 
+	const hasSelection = request.scopeText && request.scopeText !== request.fullFileText;
+
 	const userPrompt = buildImplementPrompt(
 		request.filePath,
 		request.languageId,
 		request.commentPayload,
-		request.fullFileText
+		request.fullFileText,
+		request.scopeRange,
+		request.scopeText
 	);
 
 	try {
@@ -61,6 +65,29 @@ export async function callLLMForImplement(
 		const newContent = stripCodeBlocks(text);
 
 		console.log('[Flixa] Generated new content length:', newContent.length);
+
+		if (hasSelection) {
+			const lines = request.fullFileText.split('\n');
+			const beforeSelection = lines.slice(0, request.scopeRange.startLine).join('\n');
+			const afterSelection = lines.slice(request.scopeRange.endLine + 1).join('\n');
+			
+			let mergedContent: string;
+			if (beforeSelection && afterSelection) {
+				mergedContent = beforeSelection + '\n' + newContent + '\n' + afterSelection;
+			} else if (beforeSelection) {
+				mergedContent = beforeSelection + '\n' + newContent;
+			} else if (afterSelection) {
+				mergedContent = newContent + '\n' + afterSelection;
+			} else {
+				mergedContent = newContent;
+			}
+
+			return {
+				type: 'full',
+				message: 'Implementation generated.',
+				newContent: mergedContent,
+			};
+		}
 
 		return {
 			type: 'full',

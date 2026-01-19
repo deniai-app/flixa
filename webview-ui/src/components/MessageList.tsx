@@ -53,14 +53,14 @@ export function MessageList({ messages, isLoading, streamingText, messagesEndRef
       })}
       {isLoading && (
         <div className="message-animate flex gap-2.5">
-          <div className="flex flex-col items-start gap-1 max-w-[90%]">
+          <div className="flex flex-col items-start gap-1 max-w-[90%] min-w-0">
             <div className="flex items-center gap-1.5 text-foreground-muted">
               <div className="w-5 h-5 rounded-full bg-surface-hover flex items-center justify-center text-foreground-subtle">
                 <AssistantIcon />
               </div>
               <span className="text-[10px] font-medium uppercase tracking-wide">Flixa</span>
             </div>
-            <div className="px-3.5 py-2.5 bg-surface-2 border border-border-subtle/50 rounded-2xl rounded-tl-sm">
+            <div className="px-3.5 py-2.5 bg-surface-2 rounded-2xl rounded-tl-sm min-w-0 [word-break:break-word]">
               {streamingText ? (
                 <div className="text-[13px] text-foreground leading-relaxed">
                   <MarkdownContent content={streamingText} />
