@@ -4,15 +4,15 @@
     "target": "ES2022",
     "outDir": "out",
     "lib": ["ES2022"],
-    "sourceMap": true,
+    "sourceMap": false,
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true
+    "declaration": false,
+    "declarationMap": false
   },
   "exclude": ["node_modules", ".vscode-test", "out", "webview-ui"]
 }

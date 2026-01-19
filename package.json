@@ -2,8 +2,12 @@
   "name": "flixa",
   "displayName": "Flixa",
   "description": "AI-powered code implementation assistant",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "deniai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deniai-app/flixa"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -173,7 +177,8 @@
   },
   "scripts": {
     "vscode:prepublish": "bun run compile",
-    "compile": "cd webview-ui && npm run build && cd .. && tsc -p ./",
+    "compile": "cd webview-ui && npm run build && cd .. && bun run build:ext",
+    "build:ext": "bun build ./src/extension.ts --outdir ./out --target node --format cjs --minify --external vscode",
     "build:webview": "cd webview-ui && npm run build",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
