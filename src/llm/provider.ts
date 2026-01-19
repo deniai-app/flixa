@@ -1,10 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import * as vscode from 'vscode';
 
-const OPENAI_BASE_URL =
-	process.env.NODE_ENV === 'production'
-		? 'https://flixa-api.deniai.app/v1/agent/'
-		: 'http://localhost:3000/v1/agent/';
+const OPENAI_BASE_URL = 'https://flixa-api.deniai.app/v1/agent/'
 
 export function getAnthropicProvider() {
 	console.log('[Flixa] Creating OpenAI provider with base URL:', OPENAI_BASE_URL);
