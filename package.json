@@ -2,8 +2,9 @@
   "name": "flixa",
   "displayName": "Flixa",
   "description": "AI-powered code implementation assistant",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "publisher": "deniai",
+  "icon": "assets/flixa.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/deniai-app/flixa"
@@ -12,6 +13,8 @@
     "vscode": "^1.85.0"
   },
   "categories": [
+    "AI",
+    "Chat",
     "Other"
   ],
   "activationEvents": [
