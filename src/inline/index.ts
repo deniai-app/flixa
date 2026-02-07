@@ -1,0 +1,1 @@
+export { FlixaInlineCompletionProvider } from './provider';

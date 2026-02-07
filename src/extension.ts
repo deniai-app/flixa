@@ -6,6 +6,7 @@ import { showDiffPreview } from './diff/preview';
 import { applyPendingDiff } from './diff/apply';
 import { PendingDiff, ImplementRequest, ApprovalMode } from './types';
 import { setOutputChannel } from './logger';
+import { FlixaInlineCompletionProvider } from './inline';
 
 let pendingDiff: PendingDiff | null = null;
 let chatViewProvider: ChatViewProvider | null = null;
@@ -35,6 +36,17 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   console.log('[Flixa] CodeLens provider registered');
   context.subscriptions.push(codeLensDisposable);
+
+  const inlineCompletionProvider = new FlixaInlineCompletionProvider();
+  const inlineCompletionDisposable = vscode.languages.registerInlineCompletionItemProvider(
+    [
+      { scheme: 'file', pattern: '**/*' },
+      { scheme: 'untitled' }
+    ],
+    inlineCompletionProvider
+  );
+  console.log('[Flixa] Inline completion provider registered');
+  context.subscriptions.push(inlineCompletionDisposable);
 
   chatViewProvider = new ChatViewProvider(
     context.extensionUri,

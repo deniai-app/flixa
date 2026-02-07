@@ -139,6 +139,11 @@
             "bun.lockb"
           ],
           "description": "Patterns to exclude from file list"
+        },
+        "flixa.inlineCompletion.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable inline code suggestions while typing"
         }
       }
     },
