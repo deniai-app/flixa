@@ -5,3 +5,4 @@ out/
 build/
 vscode-out/
 *.vsix
+package-lock.json
