@@ -16,6 +16,7 @@ export class FlixaInlineCompletionProvider implements vscode.InlineCompletionIte
 	): Promise<vscode.InlineCompletionItem[] | undefined> {
 		const config = vscode.workspace.getConfiguration('flixa');
 		const enabled = config.get<boolean>('inlineCompletion.enabled', false);
+		const maxLength = config.get<number>('inlineCompletion.maxLength', 120);
 
 		if (!enabled) {
 			return undefined;
@@ -66,7 +67,7 @@ export class FlixaInlineCompletionProvider implements vscode.InlineCompletionIte
 
 			const { text } = await generateText({
 				model: provider(model),
-				system: 'You are a code completion AI. Suggest a natural continuation of the code. Keep it concise (under 80 chars). Return ONLY the completion text that follows the cursor, no explanation, no markdown.',
+				system: `You are a code completion AI. Suggest a natural continuation of the code. Keep it concise (under ${maxLength} chars). Return ONLY the completion text that follows the cursor, no explanation, no markdown.`,
 				prompt: `File: ${document.fileName}\nLanguage: ${document.languageId}\n\nContext:\n${contextText.join('\n')}\n\nCursor is at the end of line ${position.line + 1}. Complete the code naturally:`,
 				abortSignal: abortController.signal,
 			});

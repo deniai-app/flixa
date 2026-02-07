@@ -144,6 +144,13 @@
           "type": "boolean",
           "default": false,
           "description": "Enable inline code suggestions while typing"
+        },
+        "flixa.inlineCompletion.maxLength": {
+          "type": "number",
+          "default": 120,
+          "minimum": 40,
+          "maximum": 200,
+          "description": "Maximum character length for inline suggestions"
         }
       }
     },
