@@ -353,32 +353,47 @@ export function applyDiffToContent(
 
     for (const line of hunk.lines) {
       if (line.startsWith(' ')) {
-        // Context line - verify it matches original
+        // Context line - verify it matches original with flexible whitespace matching
         const expectedContent = line.substring(1);
         const actualContent = lines[originalLineIndex];
-        if (actualContent !== expectedContent) {
-          // Try fuzzy match (trim whitespace)
-          if (actualContent?.trim() !== expectedContent.trim()) {
-            console.log(`[Flixa] Context mismatch at line ${originalLineIndex + 1}: expected "${expectedContent}", got "${actualContent}"`);
+        
+        // Normalize whitespace for comparison: collapse multiple spaces/tabs to single space
+        const normalizeWhitespace = (str: string) => str.replace(/\s+/g, ' ').trim();
+        const expectedNormalized = normalizeWhitespace(expectedContent);
+        const actualNormalized = actualContent ? normalizeWhitespace(actualContent) : '';
+        
+        if (expectedNormalized !== actualNormalized) {
+          // If content differs significantly, fail validation
+          if (expectedContent.trim() !== '' && actualContent?.trim() !== expectedContent.trim()) {
+            console.log(`[Flixa] Context mismatch at line ${originalLineIndex + 1}:`);
+            console.log(`  Expected: "${expectedContent}"`);
+            console.log(`  Actual:   "${actualContent}"`);
             contextValid = false;
             break;
           }
         }
         originalLineIndex++;
       } else if (line.startsWith('-')) {
-        // Deleted line - verify it exists in original
+        // Deleted line - verify it exists in original with flexible matching
         const expectedContent = line.substring(1);
         const actualContent = lines[originalLineIndex];
-        if (actualContent !== expectedContent) {
-          // Try fuzzy match (trim whitespace)
-          if (actualContent?.trim() !== expectedContent.trim()) {
-            console.log(`[Flixa] Delete line mismatch at line ${originalLineIndex + 1}: expected "${expectedContent}", got "${actualContent}"`);
+        
+        // Normalize whitespace for comparison
+        const normalizeWhitespace = (str: string) => str.replace(/\s+/g, ' ').trim();
+        const expectedNormalized = normalizeWhitespace(expectedContent);
+        const actualNormalized = actualContent ? normalizeWhitespace(actualContent) : '';
+        
+        if (expectedNormalized !== actualNormalized) {
+          // If content differs significantly, fail validation
+          if (expectedContent.trim() !== '' && actualContent?.trim() !== expectedContent.trim()) {
+            console.log(`[Flixa] Delete line mismatch at line ${originalLineIndex + 1}:`);
+            console.log(`  Expected: "${expectedContent}"`);
+            console.log(`  Actual:   "${actualContent}"`);
             contextValid = false;
             break;
           }
         }
-        originalLineIndex++;
-      } else if (line === '') {
+
         // Empty line in diff can be context or malformed
         // Check if original has empty line at this position
         if (originalLineIndex < lines.length) {

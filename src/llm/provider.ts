@@ -3,9 +3,19 @@ import * as vscode from 'vscode';
 
 const OPENAI_BASE_URL = 'https://flixa-api.deniai.app/v1/agent/'
 
+let _apiKey: string | undefined;
+
+export function setApiKey(apiKey: string | undefined): void {
+	_apiKey = apiKey;
+}
+
+export function getApiKey(): string | undefined {
+	return _apiKey;
+}
+
 export function getAnthropicProvider() {
 	console.log('[Flixa] Creating OpenAI provider with base URL:', OPENAI_BASE_URL);
-	return createOpenAI({ apiKey: 'a', baseURL: OPENAI_BASE_URL }).chat;
+	return createOpenAI({ apiKey: _apiKey || 'anonymous', baseURL: OPENAI_BASE_URL }).chat;
 }
 
 export function getModel(): string {
@@ -23,6 +33,7 @@ export function getAvailableModels(): string[] {
 			'openai/gpt-5.2-codex',
 			'openai/gpt-5.2',
 			'anthropic/claude-sonnet-4.5',
+			'anthropic/claude-opus-4.6',
 			'glm-4.6',
 			'grok-code-fast-1',
 			'google/gemini-3-pro-preview',

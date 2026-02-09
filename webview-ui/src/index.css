@@ -196,6 +196,8 @@ body {
   margin: 0.75em 0;
   border-radius: 6px;
   overflow: hidden;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .code-block-wrapper:first-child {
@@ -212,8 +214,13 @@ body {
   margin: 0;
   padding: 0.75em 1em;
   overflow-x: auto;
+  max-width: 100%;
+  white-space: pre;
+  word-wrap: normal;
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 0.85em;
+  line-height: 1.5;
+
   line-height: 1.5;
   border-radius: 6px;
 }

@@ -11,6 +11,9 @@ export interface UseVSCodeReturn {
 	deleteChat: (sessionId: string) => void;
 	stopAgent: () => void;
 	ready: () => void;
+	showUsageDetail: () => void;
+	login: () => void;
+	openBilling: () => void;
 }
 
 export function useVSCode(): UseVSCodeReturn {
@@ -50,6 +53,18 @@ export function useVSCode(): UseVSCodeReturn {
 		vscode.postMessage({ type: 'ready' });
 	}, []);
 
+	const showUsageDetail = useCallback(() => {
+		vscode.postMessage({ type: 'showUsageDetail' });
+	}, []);
+
+	const login = useCallback(() => {
+		vscode.postMessage({ type: 'login' });
+	}, []);
+
+	const openBilling = useCallback(() => {
+		vscode.postMessage({ type: 'openBilling' });
+	}, []);
+
 	return {
 		sendMessage,
 		toggleAgentMode,
@@ -60,5 +75,8 @@ export function useVSCode(): UseVSCodeReturn {
 		deleteChat,
 		stopAgent,
 		ready,
+		showUsageDetail,
+		login,
+		openBilling,
 	};
 }

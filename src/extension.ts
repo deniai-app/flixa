@@ -6,9 +6,13 @@ import { showDiffPreview } from './diff/preview';
 import { applyPendingDiff } from './diff/apply';
 import { PendingDiff, ImplementRequest, ApprovalMode } from './types';
 import { setOutputChannel } from './logger';
+import { UsageService, UsageStatusBarItem, showUsageDetailPanel } from './usage';
+import { setApiKey } from './llm/provider';
 
 let pendingDiff: PendingDiff | null = null;
 let chatViewProvider: ChatViewProvider | null = null;
+let usageService: UsageService | null = null;
+let usageStatusBarItem: UsageStatusBarItem | null = null;
 
 function storePendingDiff(diff: PendingDiff): void {
   pendingDiff = diff;
@@ -18,12 +22,32 @@ function clearPendingDiff(): void {
   pendingDiff = null;
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel('Flixa');
   setOutputChannel(outputChannel);
   context.subscriptions.push(outputChannel);
 
   console.log('[Flixa] Extension activated!');
+
+  usageService = new UsageService(context);
+
+  const apiKey = await usageService.getApiKey();
+  setApiKey(apiKey);
+
+  usageService.onUsageChanged(async () => {
+    const newApiKey = await usageService!.getApiKey();
+    setApiKey(newApiKey);
+  });
+
+  usageStatusBarItem = new UsageStatusBarItem(usageService);
+  context.subscriptions.push({
+    dispose: () => usageStatusBarItem?.dispose(),
+  });
+
+  const isLoggedIn = await usageService.isLoggedIn();
+  if (isLoggedIn) {
+    usageService.fetchUsage();
+  }
 
   const codeLensProvider = new FlixaCodeLensProvider();
   const codeLensDisposable = vscode.languages.registerCodeLensProvider(
@@ -39,8 +63,17 @@ export function activate(context: vscode.ExtensionContext): void {
   chatViewProvider = new ChatViewProvider(
     context.extensionUri,
     context,
-    storePendingDiff
+    storePendingDiff,
+    usageService
   );
+
+  usageService.onUsageChanged((data) => {
+    if (chatViewProvider) {
+      chatViewProvider.updateUsage(data);
+    }
+    usageStatusBarItem?.refresh();
+  });
+
   const chatViewDisposable = vscode.window.registerWebviewViewProvider(
     ChatViewProvider.viewType,
     chatViewProvider
@@ -133,6 +166,48 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
   context.subscriptions.push(setApprovalModeCommand);
+
+  const showUsageDetailCommand = vscode.commands.registerCommand(
+    'flixa.showUsageDetail',
+    async () => {
+      if (usageService) {
+        await showUsageDetailPanel(usageService);
+      }
+    }
+  );
+  context.subscriptions.push(showUsageDetailCommand);
+
+  const loginCommand = vscode.commands.registerCommand(
+    'flixa.login',
+    async () => {
+      if (!usageService) {
+        return;
+      }
+      await usageService.loginWithDeviceAuth();
+    }
+  );
+  context.subscriptions.push(loginCommand);
+
+  const logoutCommand = vscode.commands.registerCommand(
+    'flixa.logout',
+    async () => {
+      if (usageService) {
+        await usageService.logout();
+        vscode.window.showInformationMessage('Deni AI: Logged out');
+      }
+    }
+  );
+  context.subscriptions.push(logoutCommand);
+
+  const refreshUsageCommand = vscode.commands.registerCommand(
+    'flixa.refreshUsage',
+    async () => {
+      if (usageService) {
+        await usageService.fetchUsage(true);
+      }
+    }
+  );
+  context.subscriptions.push(refreshUsageCommand);
 }
 
 async function handleImplement(
@@ -179,6 +254,8 @@ async function handleImplement(
 export function deactivate(): void {
   pendingDiff = null;
   chatViewProvider = null;
+  usageService = null;
+  usageStatusBarItem = null;
 }
 
 async function handleInlineEdit(): Promise<void> {

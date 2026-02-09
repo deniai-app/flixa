@@ -18,6 +18,8 @@ import { describeAction } from '../utils/format';
 import { gatherChatContext } from './context';
 import { SessionManager, type ChatMessage, type ChatSession } from './session';
 import { getWebviewHtml } from './webview';
+import type { UsageService } from '../usage/service';
+import { PREMIUM_MODELS, type UsageCategory } from '../usage/types';
 
 const MAX_AGENT_ITERATIONS = Infinity;
 
@@ -34,15 +36,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	private _isAgentRunning: boolean = false;
 	private _stopRequested: boolean = false;
 	private _currentAbortController?: AbortController;
+	private _usageService?: UsageService;
 
 	constructor(
 		extensionUri: vscode.Uri,
 		context: vscode.ExtensionContext,
-		storePendingDiff: (diff: PendingDiff) => void
+		storePendingDiff: (diff: PendingDiff) => void,
+		usageService?: UsageService
 	) {
 		this._extensionUri = extensionUri;
 		this._sessionManager = new SessionManager(context);
 		this._storePendingDiff = storePendingDiff;
+		this._usageService = usageService;
 	}
 
 	public clearHistory(): void {
@@ -75,6 +80,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				this._updateState();
 				this._updateMessages();
 				this._updateSessions();
+				if (this._usageService) {
+					this.updateUsage(this._usageService.getCachedUsage());
+				}
 			} else if (data.type === 'sendMessage') {
 				await this._handleUserMessage(data.message);
 			} else if (data.type === 'toggleAgentMode') {
@@ -101,6 +109,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				this._sessionManager.deleteSession(data.sessionId);
 				this._updateMessages();
 				this._updateSessions();
+			} else if (data.type === 'showUsageDetail') {
+				vscode.commands.executeCommand('flixa.showUsageDetail');
+			} else if (data.type === 'login') {
+				vscode.commands.executeCommand('flixa.login');
+			} else if (data.type === 'openBilling') {
+				if (this._usageService) {
+					const billingUrl = this._usageService.getBillingUrl();
+					vscode.env.openExternal(vscode.Uri.parse(billingUrl));
+				}
 			}
 		});
 	}
@@ -158,6 +175,42 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		const currentSession = this._sessionManager.getCurrentSession();
 		const isFirstMessage = currentSession && currentSession.messages.length === 0;
 
+		const currentModel = getModel();
+		const usageCategory: UsageCategory = PREMIUM_MODELS.includes(currentModel)
+			? 'premium'
+			: 'basic';
+
+		if (this._usageService) {
+			console.log('[Flixa] Checking quota for category:', usageCategory);
+			const quotaCheck = this._usageService.checkQuotaAndWarn(usageCategory);
+			console.log('[Flixa] Quota check result:', quotaCheck);
+			if (!quotaCheck.canProceed) {
+				if (quotaCheck.maxModeEligible) {
+					const action = await vscode.window.showWarningMessage(
+						`Deni AI: ${usageCategory} quota exhausted. Enable Max Mode to continue (additional charges apply).`,
+						'Enable Max Mode',
+						'Upgrade Plan'
+					);
+					if (action === 'Upgrade Plan') {
+						vscode.env.openExternal(
+							vscode.Uri.parse(this._usageService.getBillingUrl())
+						);
+					}
+				} else {
+					const action = await vscode.window.showErrorMessage(
+						`Deni AI: ${usageCategory} quota exhausted. Please upgrade your plan.`,
+						'Upgrade Plan'
+					);
+					if (action === 'Upgrade Plan') {
+						vscode.env.openExternal(
+							vscode.Uri.parse(this._usageService.getBillingUrl())
+						);
+					}
+				}
+				return;
+			}
+		}
+
 		this._sessionManager.pushMessage({ role: 'user', content: message });
 		this._updateMessages();
 
@@ -178,11 +231,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		);
 
 		if (this._agentMode) {
-			await this._handleAgentLoop(context);
+			await this._handleAgentLoop(context, usageCategory);
 		} else {
 			this._setLoading(true);
 			try {
-				await this._handleChatMessage(context);
+				await this._handleChatMessage(context, usageCategory);
 			} finally {
 				this._setLoading(false);
 			}
@@ -201,7 +254,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		} catch { }
 	}
 
-	private async _handleAgentLoop(context: ChatContext): Promise<void> {
+	private async _handleAgentLoop(
+		context: ChatContext,
+		usageCategory: UsageCategory
+	): Promise<void> {
 		let iteration = 0;
 		let retryCount = 0;
 		const maxRetries = 3;
@@ -272,6 +328,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 						content: response.message,
 					});
 					this._updateMessages();
+
+					if (this._usageService) {
+						this._usageService.refreshAfterSend(usageCategory);
+					}
 					break;
 				}
 
@@ -288,6 +348,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 						content: `[Agent] ${agentResponse.message}`,
 					});
 					this._updateMessages();
+
+					if (this._usageService) {
+						this._usageService.refreshAfterSend(usageCategory);
+					}
 					break;
 				}
 
@@ -394,7 +458,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
-	private async _handleChatMessage(context: ChatContext): Promise<void> {
+	private async _handleChatMessage(
+		context: ChatContext,
+		usageCategory: UsageCategory
+	): Promise<void> {
 		const chatAbortController = new AbortController();
 		this._currentAbortController = chatAbortController;
 		const response = await callLLMForChat(
@@ -468,6 +535,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			});
 			this._updateMessages();
 		}
+
+		if (this._usageService) {
+			this._usageService.refreshAfterSend(usageCategory);
+		}
 	}
 
 	private _updateMessages(): void {
@@ -499,17 +570,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		} catch { }
 	}
 
-	private _updateState(): void {
+	private async _updateState(): Promise<void> {
 		if (!this._view) {
 			return;
 		}
 		try {
+			const isLoggedIn = this._usageService ? await this._usageService.isLoggedIn() : false;
 			this._view.webview.postMessage({
 				type: 'updateState',
 				agentMode: this._agentMode,
 				approvalMode: this._approvalMode,
 				selectedModel: getModel(),
 				availableModels: getAvailableModels(),
+				isLoggedIn,
+			});
+		} catch { }
+	}
+
+	public async updateUsage(data: import('../usage/types').UsageResponse | null): Promise<void> {
+		if (!this._view) {
+			return;
+		}
+		try {
+			const isLoggedIn = this._usageService ? await this._usageService.isLoggedIn() : false;
+			this._view.webview.postMessage({
+				type: 'updateUsage',
+				usage: data,
+				isLoggedIn,
 			});
 		} catch { }
 	}

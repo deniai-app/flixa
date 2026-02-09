@@ -5,19 +5,10 @@ import type { ChatSession } from '../types';
 interface HeaderProps {
   sessions: ChatSession[];
   currentSessionId: string;
-  openTabs: string[];
   onSessionChange: (sessionId: string) => void;
   onNewChat: () => void;
   onDeleteChat: (sessionId: string) => void;
-  onCloseTab: (sessionId: string) => void;
-  onOpenTab: (sessionId: string) => void;
 }
-
-const CloseIcon = () => (
-  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
 
 const AddIcon = () => (
   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -42,12 +33,9 @@ const MoreIcon = () => (
 export function Header({
   sessions,
   currentSessionId,
-  openTabs,
   onSessionChange,
   onNewChat,
   onDeleteChat,
-  onCloseTab,
-  onOpenTab,
 }: HeaderProps) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -55,8 +43,6 @@ export function Header({
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [historyPosition, setHistoryPosition] = useState({ top: 0, left: 0 });
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-
-  const openSessions = sessions.filter(s => openTabs.includes(s.id));
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -97,13 +83,7 @@ export function Header({
     }
   }, [isMenuOpen]);
 
-  const handleCloseTab = (e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation();
-    onCloseTab(sessionId);
-  };
-
   const handleOpenFromHistory = (sessionId: string) => {
-    onOpenTab(sessionId);
     onSessionChange(sessionId);
     setIsHistoryOpen(false);
   };
@@ -129,15 +109,12 @@ export function Header({
           <button
             type="button"
             key={session.id}
-            className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs border-b border-menu-separator last:border-b-0 text-left flex items-center justify-between gap-2 ${
-              openTabs.includes(session.id) ? 'text-foreground-subtle' : 'text-menu-foreground'
+            className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs border-b border-menu-separator last:border-b-0 text-left ${
+              session.id === currentSessionId ? 'text-foreground' : 'text-menu-foreground'
             }`}
             onClick={() => handleOpenFromHistory(session.id)}
           >
             <span className="truncate">{session.name}</span>
-            {openTabs.includes(session.id) && (
-              <span className="text-[10px] text-foreground-subtle">open</span>
-            )}
           </button>
         ))
       )}
@@ -191,33 +168,10 @@ export function Header({
           >
             <HistoryIcon />
           </button>
-          <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
-            {openSessions.map((session) => (
-              <button
-                key={session.id}
-                type="button"
-                onClick={() => onSessionChange(session.id)}
-                className={`group flex items-center gap-1 px-2.5 py-1.5 text-xs whitespace-nowrap border-r border-input-border transition-colors ${
-                  session.id === currentSessionId
-                    ? 'bg-surface-hover text-foreground'
-                    : 'text-foreground-subtle hover:text-foreground hover:bg-surface-hover/50'
-                }`}
-              >
-                <span className="truncate max-w-[80px]">{truncateName(session.name)}</span>
-                <button
-                  type="button"
-                  onClick={(e) => handleCloseTab(e, session.id)}
-                  className={`p-0.5 rounded hover:bg-error/20 hover:text-error transition-colors ${
-                    session.id === currentSessionId
-                      ? 'opacity-70 hover:opacity-100'
-                      : 'opacity-0 group-hover:opacity-70 hover:!opacity-100'
-                  }`}
-                  title="Close tab"
-                >
-                  <CloseIcon />
-                </button>
-              </button>
-            ))}
+          <div className="flex-1 flex items-center px-2.5 py-1.5 text-xs text-foreground-subtle truncate">
+            {currentSessionId
+              ? truncateName(sessions.find(session => session.id === currentSessionId)?.name ?? 'Conversation')
+              : 'Conversation'}
           </div>
           <button
             type="button"
