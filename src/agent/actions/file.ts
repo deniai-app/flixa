@@ -20,6 +20,20 @@ import { containsNullBytes } from '../../utils/validation';
 import { applyDiffToContent } from '../../diff/validator';
 import { buildDocumentStats, searchDocuments, type DocumentStats } from '../../search/scorer';
 
+function normalizeGlobPattern(pattern?: string): string | undefined {
+	if (!pattern) {
+		return undefined;
+	}
+	const trimmed = pattern.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+	if (trimmed.includes('**') || trimmed.includes('/') || trimmed.includes('\\')) {
+		return trimmed;
+	}
+	return `**/${trimmed}`;
+}
+
 export async function executeWriteFileAction(
 	action: AgentActionWriteFile,
 	abortSignal?: AbortSignal
@@ -340,30 +354,70 @@ export async function executeGrepSearchAction(
 			};
 		}
 
-		const includePattern = action.include_pattern || '**/*';
-		const excludePattern = action.exclude_pattern || '**/node_modules/**';
+		const includePattern = normalizeGlobPattern(action.include_pattern) || '**/*';
+		const excludePattern =
+			normalizeGlobPattern(action.exclude_pattern) || '**/node_modules/**';
 
-		const files = await vscode.workspace.findFiles(includePattern, excludePattern, 1000);
+		try {
+			new RegExp(action.query);
+		} catch (error) {
+			return {
+				action,
+				success: false,
+				error: `Invalid regex pattern: ${error instanceof Error ? error.message : String(error)}`,
+			};
+		}
+
+		const cancellation = new vscode.CancellationTokenSource();
+		abortSignal?.addEventListener('abort', () => cancellation.cancel());
+
+		const matches: Array<{ uri: vscode.Uri; line: number }> = [];
+		const query: vscode.TextSearchQuery = {
+			pattern: action.query,
+			isRegExp: true,
+			isCaseSensitive: action.case_sensitive === true,
+		};
+
+		await vscode.workspace.findTextInFiles(
+			query,
+			{
+				include: includePattern,
+				exclude: excludePattern,
+				maxResults: 50,
+			},
+			(result) => {
+				if (abortSignal?.aborted || matches.length >= 50) {
+					return;
+				}
+				if ('ranges' in result) {
+					const ranges = Array.isArray(result.ranges)
+						? result.ranges
+						: [result.ranges];
+					for (const range of ranges) {
+						if (matches.length >= 50) break;
+						matches.push({ uri: result.uri, line: range.start.line });
+					}
+				}
+			},
+			cancellation.token
+		);
+
 		const results: string[] = [];
-		const regex = new RegExp(action.query, action.case_sensitive ? 'g' : 'gi');
+		const documentCache = new Map<string, vscode.TextDocument>();
 
-		for (const file of files) {
+		for (const match of matches) {
 			if (abortSignal?.aborted) break;
 			if (results.length >= 50) break;
-
 			try {
-				const document = await vscode.workspace.openTextDocument(file);
-				const content = document.getText();
-				const lines = content.split('\n');
-
-				for (let i = 0; i < lines.length; i++) {
-					if (results.length >= 50) break;
-					if (regex.test(lines[i])) {
-						const relativePath = path.relative(workspaceRoot, file.fsPath);
-						results.push(`${relativePath}:${i + 1}: ${lines[i].trim()}`);
-					}
-					regex.lastIndex = 0;
+				const cacheKey = match.uri.fsPath;
+				let document = documentCache.get(cacheKey);
+				if (!document) {
+					document = await vscode.workspace.openTextDocument(match.uri);
+					documentCache.set(cacheKey, document);
 				}
+				const lineText = document.lineAt(match.line).text.trim();
+				const relativePath = path.relative(workspaceRoot, match.uri.fsPath);
+				results.push(`${relativePath}:${match.line + 1}: ${lineText}`);
 			} catch {
 				// Skip files that can't be read
 			}

@@ -19,7 +19,7 @@ function getDeniAiBaseUrl(): string {
 	return config.get<string>('deniAiBaseUrl') || 'https://deniai.app';
 }
 
-function getFlixaApiBaseUrl(): string {
+export function getFlixaApiBaseUrl(): string {
 	const config = vscode.workspace.getConfiguration('flixa');
 	return config.get<string>('flixaApiBaseUrl') || 'https://flixa-api.deniai.app';
 }

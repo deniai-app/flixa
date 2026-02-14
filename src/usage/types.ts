@@ -28,12 +28,12 @@ export interface UsageErrorResponse {
 		type: 'authentication_error' | 'server_error';
 		param: null;
 		code:
-			| 'missing_auth_header'
-			| 'missing_api_key'
-			| 'invalid_key'
-			| 'expired_key'
-			| 'db_error'
-			| 'usage_fetch_error';
+		| 'missing_auth_header'
+		| 'missing_api_key'
+		| 'invalid_key'
+		| 'expired_key'
+		| 'db_error'
+		| 'usage_fetch_error';
 	};
 }
 
@@ -55,7 +55,7 @@ export interface DeviceAuthPollResponse {
 
 export const PREMIUM_MODELS = [
 	'anthropic/claude-opus-4.6',
-	'openai/gpt-5.2',
+	'anthropic/claude-sonnet-4.5',
 	'google/gemini-3-pro-preview',
 ];
 

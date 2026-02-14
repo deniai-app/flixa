@@ -1,7 +1,10 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import * as vscode from 'vscode';
+import { getFlixaApiBaseUrl } from '../usage/service';
 
-const OPENAI_BASE_URL = 'https://flixa-api.deniai.app/v1/agent/'
+const FLIXA_BASE_URL = getFlixaApiBaseUrl();
+
+const OPENAI_BASE_URL = `${FLIXA_BASE_URL}/v1/agent/`
 
 let _apiKey: string | undefined;
 

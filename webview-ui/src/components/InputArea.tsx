@@ -1,751 +1,803 @@
-import {
-	type ChangeEvent,
-	type KeyboardEvent,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
-import { createPortal } from 'react-dom';
-import type { ChatSession, UsageData, Tier } from '../types';
-import { getModelTierRequirement, canUseTier } from '../types';
+import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import type { ChatSession, UsageData, Tier } from "../types";
+import { getModelTierRequirement, canUseTier } from "../types";
 
 interface InputAreaProps {
-	sessions: ChatSession[];
-	currentSessionId: string;
-	onSessionChange: (sessionId: string) => void;
-	onNewChat: () => void;
-	onDeleteChat: (sessionId: string) => void;
-	agentMode: boolean;
-	approvalMode: string;
-	selectedModel: string;
-	availableModels: string[];
-	isLoading: boolean;
-	agentRunning: boolean;
-	text: string;
-	onTextChange: (text: string) => void;
-	onSendMessage: (text: string) => void;
-	onModeChange: (mode: string) => void;
-	onApprovalChange: (mode: string) => void;
-	onModelChange: (model: string) => void;
-	onStop: () => void;
-	usageData: UsageData | null;
-	isLoggedIn: boolean;
-	onUsageClick: () => void;
-	onLogin: () => void;
-	onOpenBilling: () => void;
+  sessions: ChatSession[];
+  currentSessionId: string;
+  onSessionChange: (sessionId: string) => void;
+  onNewChat: () => void;
+  onDeleteChat: (sessionId: string) => void;
+  agentMode: boolean;
+  approvalMode: string;
+  selectedModel: string;
+  availableModels: string[];
+  isLoading: boolean;
+  agentRunning: boolean;
+  text: string;
+  onTextChange: (text: string) => void;
+  onSendMessage: (text: string) => void;
+  onModeChange: (mode: string) => void;
+  onApprovalChange: (mode: string) => void;
+  onModelChange: (model: string) => void;
+  onStop: () => void;
+  usageData: UsageData | null;
+  isLoggedIn: boolean;
+  onUsageClick: () => void;
+  onLogin: () => void;
+  onOpenBilling: () => void;
 }
 
 const ChatIcon = () => (
-	<svg
-		className="w-4 h-4"
-		fill="none"
-		stroke="currentColor"
-		viewBox="0 0 24 24"
-		aria-hidden="true"
-	>
-		<path
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			strokeWidth={2}
-			d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-		/>
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+    />
+  </svg>
 );
 
 const AgentIcon = () => (
-	<svg
-		className="w-4 h-4"
-		fill="none"
-		stroke="currentColor"
-		viewBox="0 0 24 24"
-		aria-hidden="true"
-	>
-		<path
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			strokeWidth={2}
-			d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-		/>
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+    />
+  </svg>
 );
 
 const AllApproveIcon = () => (
-	<svg
-		className="w-4 h-4"
-		fill="none"
-		stroke="currentColor"
-		viewBox="0 0 24 24"
-		aria-hidden="true"
-	>
-		<path
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			strokeWidth={2}
-			d="M13 10V3L4 14h7v7l9-11h-7z"
-		/>
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M13 10V3L4 14h7v7l9-11h-7z"
+    />
+  </svg>
 );
 
 const AutoApproveIcon = () => (
-	<svg
-		className="w-4 h-4"
-		fill="none"
-		stroke="currentColor"
-		viewBox="0 0 24 24"
-		aria-hidden="true"
-	>
-		<path
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			strokeWidth={2}
-			d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-		/>
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+    />
+  </svg>
 );
 
 const SafeApproveIcon = () => (
-	<svg
-		className="w-4 h-4"
-		fill="none"
-		stroke="currentColor"
-		viewBox="0 0 24 24"
-		aria-hidden="true"
-	>
-		<path
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			strokeWidth={2}
-			d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-		/>
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+    />
+  </svg>
 );
 
 const ManualApproveIcon = () => (
-	<svg
-		className="w-4 h-4"
-		fill="none"
-		stroke="currentColor"
-		viewBox="0 0 24 24"
-		aria-hidden="true"
-	>
-		<path
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			strokeWidth={2}
-			d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"
-		/>
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"
+    />
+  </svg>
 );
 
 const HistoryIcon = () => (
-	<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+  </svg>
 );
 
 const AddIcon = () => (
-	<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
 );
 
 const SettingsIcon = () => (
-	<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-	</svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+    />
+  </svg>
 );
 
 const modeOptions = [
-	{
-		value: "chat",
-		label: "Chat",
-		description:
-			"Simple chat mode for asking questions and discussing code without executing actions.",
-		icon: <ChatIcon />,
-	},
-	{
-		value: "agent",
-		label: "Agent",
-		description:
-			"Autonomous agent mode that can execute shell commands, edit files, and perform complex tasks.",
-		icon: <AgentIcon />,
-	},
+  {
+    value: "chat",
+    label: "Chat",
+    description:
+      "Simple chat mode for asking questions and discussing code without executing actions.",
+    icon: <ChatIcon />,
+  },
+  {
+    value: "agent",
+    label: "Agent",
+    description:
+      "Autonomous agent mode that can execute shell commands, edit files, and perform complex tasks.",
+    icon: <AgentIcon />,
+  },
 ];
 
 const approvalOptions = [
-	{
-		value: "ALL_APPROVE",
-		label: "All Approve",
-		description:
-			"Execute all actions immediately without any confirmation. Use with caution.",
-		icon: <AllApproveIcon />,
-	},
-	{
-		value: "AUTO_APPROVE",
-		label: "Auto",
-		description:
-			"AI safety check for shell commands, auto-execute file operations.",
-		icon: <AutoApproveIcon />,
-	},
-	{
-		value: "SAFE_APPROVE",
-		label: "Safe Approve",
-		description:
-			"User confirmation for shell commands, auto-execute safe file operations.",
-		icon: <SafeApproveIcon />,
-	},
-	{
-		value: "MANUAL_APPROVE",
-		label: "Manual Approve",
-		description:
-			"User confirmation required for all actions. Most secure option.",
-		icon: <ManualApproveIcon />,
-	},
+  {
+    value: "ALL_APPROVE",
+    label: "All Approve",
+    description: "Execute all actions immediately without any confirmation. Use with caution.",
+    icon: <AllApproveIcon />,
+  },
+  {
+    value: "AUTO_APPROVE",
+    label: "Auto",
+    description: "AI safety check for shell commands, auto-execute file operations.",
+    icon: <AutoApproveIcon />,
+  },
+  {
+    value: "SAFE_APPROVE",
+    label: "Safe Approve",
+    description: "User confirmation for shell commands, auto-execute safe file operations.",
+    icon: <SafeApproveIcon />,
+  },
+  {
+    value: "MANUAL_APPROVE",
+    label: "Manual Approve",
+    description: "User confirmation required for all actions. Most secure option.",
+    icon: <ManualApproveIcon />,
+  },
 ];
 
 const getModelLabel = (model: string): string => {
-	const labels: Record<string, string> = {
-		"openai/gpt-5.2-codex": "GPT-5.2 Codex",
-		"openai/gpt-5.2": "GPT-5.2",
-		"anthropic/claude-sonnet-4.5": "Sonnet 4.5",
-		"anthropic/claude-opus-4.6": "Opus 4.6",
-		"glm-4.6": "GLM-4.6",
-		"grok-code-fast-1": "Grok Code",
-		"google/gemini-3-pro-preview": "Gemini 3 Pro",
-		"google/gemini-3-flash-preview": "Gemini 3 Flash",
-	};
-	return labels[model] || model;
+  const labels: Record<string, string> = {
+    "openai/gpt-5.3-codex": "GPT-5.3 Codex",
+    "openai/gpt-5.2-codex": "GPT-5.2 Codex",
+    "openai/gpt-5.2": "GPT-5.2",
+    "anthropic/claude-sonnet-4.5": "Sonnet 4.5",
+    "anthropic/claude-opus-4.6": "Opus 4.6",
+    "glm-4.6": "GLM-4.6",
+    "grok-code-fast-1": "Grok Code",
+    "google/gemini-3-pro-preview": "Gemini 3 Pro",
+    "google/gemini-3-flash-preview": "Gemini 3 Flash",
+  };
+  return labels[model] || model;
 };
 
 const getUsageColorClass = (usageData: UsageData): string => {
-	const basic = usageData.usage.find(u => u.category === 'basic');
-	const premium = usageData.usage.find(u => u.category === 'premium');
+  const basic = usageData.usage.find((u) => u.category === "basic");
+  const premium = usageData.usage.find((u) => u.category === "premium");
 
-	const basicPct = basic ? (basic.remaining / basic.limit) * 100 : 100;
-	const premiumPct = premium ? (premium.remaining / premium.limit) * 100 : 100;
-	const worstPct = Math.min(basicPct, premiumPct);
+  const basicPct = basic ? (basic.remaining / basic.limit) * 100 : 100;
+  const premiumPct = premium ? (premium.remaining / premium.limit) * 100 : 100;
+  const worstPct = Math.min(basicPct, premiumPct);
 
-	if (worstPct <= 0) {
-		return 'bg-error/20 text-error';
-	}
-	if (worstPct <= 10) {
-		return 'bg-warning/20 text-warning';
-	}
-	return 'bg-surface-hover text-foreground-subtle hover:text-foreground';
+  if (worstPct <= 0) {
+    return "bg-error/20 text-error";
+  }
+  if (worstPct <= 10) {
+    return "bg-warning/20 text-warning";
+  }
+  return "bg-surface-hover text-foreground-subtle hover:text-foreground";
 };
 
 const isModelLocked = (model: string, tier: Tier | null, isLoggedIn: boolean): boolean => {
-	if (!isLoggedIn) {
-		return true;
-	}
-	if (!tier) {
-		return true;
-	}
-	const required = getModelTierRequirement(model);
-	return !canUseTier(tier, required);
+  if (!isLoggedIn) {
+    return true;
+  }
+  if (!tier) {
+    return true;
+  }
+  const required = getModelTierRequirement(model);
+  return !canUseTier(tier, required);
 };
 
 const getModelLockMessage = (model: string, isLoggedIn: boolean): string => {
-	if (!isLoggedIn) {
-		return 'Login required';
-	}
-	const required = getModelTierRequirement(model);
-	if (required === 'pro') {
-		return 'Pro plan required';
-	}
-	if (required === 'plus') {
-		return 'Plus plan or higher required';
-	}
-	return '';
+  if (!isLoggedIn) {
+    return "Login required";
+  }
+  const required = getModelTierRequirement(model);
+  if (required === "pro") {
+    return "Pro plan required";
+  }
+  if (required === "plus") {
+    return "Plus plan or higher required";
+  }
+  return "";
 };
 
 export function InputArea({
-	sessions,
-	currentSessionId,
-	onSessionChange,
-	onNewChat,
-	onDeleteChat,
-	agentMode,
-	approvalMode,
-	selectedModel,
-	availableModels,
-	isLoading,
-	agentRunning,
-	text,
-	onTextChange,
-	onSendMessage,
-	onModeChange,
-	onApprovalChange,
-	onModelChange,
-	onStop,
-	usageData,
-	isLoggedIn,
-	onUsageClick,
-	onLogin,
-	onOpenBilling,
+  sessions,
+  currentSessionId,
+  onSessionChange,
+  onNewChat,
+  onDeleteChat,
+  agentMode,
+  approvalMode,
+  selectedModel,
+  availableModels,
+  isLoading,
+  agentRunning,
+  text,
+  onTextChange,
+  onSendMessage,
+  onModeChange,
+  onApprovalChange,
+  onModelChange,
+  onStop,
+  usageData,
+  isLoggedIn,
+  onUsageClick,
+  onLogin,
+  onOpenBilling,
 }: InputAreaProps) {
-	const [isCompact, setIsCompact] = useState(false);
-	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-	const historyButtonRef = useRef<HTMLButtonElement>(null);
-	const settingsButtonRef = useRef<HTMLButtonElement>(null);
-	const [historyPosition, setHistoryPosition] = useState({ top: 0, left: 0 });
-	const containerRef = useRef<HTMLDivElement>(null);
-	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-	const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
-	const [settingsPosition, setSettingsPosition] = useState({ bottom: 0, left: 0 });
+  const [isCompact, setIsCompact] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const [historyPosition, setHistoryPosition] = useState({ top: 0, left: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
+  const [settingsPosition, setSettingsPosition] = useState({ bottom: 0, left: 0 });
 
-	const userTier = usageData?.tier ?? null;
+  const userTier = usageData?.tier ?? null;
 
-	const modelOptions = availableModels.map((model) => ({
-		value: model,
-		label: getModelLabel(model),
-		description: "",
-		locked: isModelLocked(model, userTier, isLoggedIn),
-		lockMessage: getModelLockMessage(model, isLoggedIn),
-	}));
+  const modelOptions = availableModels.map((model) => ({
+    value: model,
+    label: getModelLabel(model),
+    description: "",
+    locked: isModelLocked(model, userTier, isLoggedIn),
+    lockMessage: getModelLockMessage(model, isLoggedIn),
+  }));
 
-	useEffect(() => {
-		const checkWidth = () => {
-			if (containerRef.current) {
-				setIsCompact(containerRef.current.offsetWidth < 300);
-			}
-		};
-		checkWidth();
-		const resizeObserver = new ResizeObserver(checkWidth);
-		if (containerRef.current) {
-			resizeObserver.observe(containerRef.current);
-		}
-		return () => resizeObserver.disconnect();
-	}, []);
+  useEffect(() => {
+    const checkWidth = () => {
+      if (containerRef.current) {
+        setIsCompact(containerRef.current.offsetWidth < 300);
+      }
+    };
+    checkWidth();
+    const resizeObserver = new ResizeObserver(checkWidth);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    return () => resizeObserver.disconnect();
+  }, []);
 
-	useEffect(() => {
-		const handleClickOutside = (e: MouseEvent) => {
-			const historyMenu = document.getElementById('history-menu');
-			const settingsMenu = document.getElementById('settings-menu');
-			if (historyButtonRef.current && !historyButtonRef.current.contains(e.target as Node)) {
-				if (historyMenu && !historyMenu.contains(e.target as Node)) {
-					setIsHistoryOpen(false);
-				}
-			}
-			if (settingsButtonRef.current && !settingsButtonRef.current.contains(e.target as Node)) {
-				if (settingsMenu && !settingsMenu.contains(e.target as Node)) {
-					setIsSettingsOpen(false);
-					setActiveSubmenu(null);
-				}
-			}
-		};
-		document.addEventListener('mousedown', handleClickOutside);
-		return () => document.removeEventListener('mousedown', handleClickOutside);
-	}, []);
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const historyMenu = document.getElementById("history-menu");
+      const settingsMenu = document.getElementById("settings-menu");
+      if (historyButtonRef.current && !historyButtonRef.current.contains(e.target as Node)) {
+        if (historyMenu && !historyMenu.contains(e.target as Node)) {
+          setIsHistoryOpen(false);
+        }
+      }
+      if (settingsButtonRef.current && !settingsButtonRef.current.contains(e.target as Node)) {
+        if (settingsMenu && !settingsMenu.contains(e.target as Node)) {
+          setIsSettingsOpen(false);
+          setActiveSubmenu(null);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-	useEffect(() => {
-		if (isSettingsOpen && settingsButtonRef.current && containerRef.current) {
-			const buttonRect = settingsButtonRef.current.getBoundingClientRect();
-			setSettingsPosition({
-				bottom: window.innerHeight - containerRef.current.getBoundingClientRect().top + 8,
-				left: Math.max(8, buttonRect.left),
-			});
-		}
-	}, [isSettingsOpen]);
+  useEffect(() => {
+    if (isSettingsOpen && settingsButtonRef.current) {
+      const buttonRect = settingsButtonRef.current.getBoundingClientRect();
+      const settingsMenu = document.getElementById("settings-menu");
+      const viewportWidth = window.innerWidth;
+      const menuWidth = settingsMenu?.offsetWidth ?? 200;
+      let left = buttonRect.left;
+      if (left + menuWidth > viewportWidth - 8) {
+        left = Math.max(8, viewportWidth - menuWidth - 8);
+      }
+      setSettingsPosition({
+        bottom: window.innerHeight - buttonRect.bottom + 24,
+        left,
+      });
+    }
+  }, [isSettingsOpen]);
 
-	useEffect(() => {
-		if (isHistoryOpen && historyButtonRef.current) {
-			const rect = historyButtonRef.current.getBoundingClientRect();
-			setHistoryPosition({
-				top: rect.top - 8,
-				left: Math.max(8, rect.left),
-			});
-		}
-	}, [isHistoryOpen]);
+  useEffect(() => {
+    if (isHistoryOpen && historyButtonRef.current) {
+      const rect = historyButtonRef.current.getBoundingClientRect();
+      setHistoryPosition({
+        top: rect.top - 8,
+        left: Math.max(8, rect.left),
+      });
+    }
+  }, [isHistoryOpen]);
 
-	const handleOpenFromHistory = (sessionId: string) => {
-		onSessionChange(sessionId);
-		setIsHistoryOpen(false);
-	};
+  const handleOpenFromHistory = (sessionId: string) => {
+    onSessionChange(sessionId);
+    setIsHistoryOpen(false);
+  };
 
-	const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-		if (e.key === "Enter" && !e.shiftKey) {
-			e.preventDefault();
-			handleSend();
-		}
-	};
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
-	const handleSend = () => {
-		if (text.trim() && !isLoading) {
-			onSendMessage(text);
-			onTextChange("");
-		}
-	};
+  const handleSend = () => {
+    if (text.trim() && !isLoading) {
+      onSendMessage(text);
+      onTextChange("");
+    }
+  };
 
-	const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-		onTextChange(e.target.value);
-		e.target.style.height = "auto";
-		e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px";
-	};
+  const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    onTextChange(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px";
+  };
 
-	const historyMenu = isHistoryOpen && createPortal(
-		<div
-			id="history-menu"
-			className="fixed z-[9999] min-w-[220px] max-h-[300px] overflow-y-auto bg-menu-bg border border-menu-border rounded-lg shadow-[0_12px_24px_var(--color-shadow)]"
-			style={{
-				top: historyPosition.top,
-				left: historyPosition.left,
-				transform: 'translateY(-100%)',
-			}}
-		>
-			{sessions.length === 0 ? (
-				<div className="px-3 py-2 text-xs text-foreground-subtle">No conversations</div>
-			) : (
-				sessions.map((session) => (
-					<div
-						key={session.id}
-						className={`flex items-center justify-between group hover:bg-menu-selected-bg border-b border-menu-separator last:border-b-0 ${
-							session.id === currentSessionId ? 'bg-menu-selected-bg' : ''
-						}`}
-					>
-						<button
-							type="button"
-							className={`flex-1 px-3 py-2 cursor-pointer transition-colors text-xs text-left ${
-								session.id === currentSessionId ? 'text-foreground' : 'text-menu-foreground'
-							}`}
-							onClick={() => handleOpenFromHistory(session.id)}
-						>
-							<span className="truncate block">{session.name}</span>
-						</button>
-						<button
-							type="button"
-							className="flex-shrink-0 p-2 text-foreground-subtle hover:text-error transition-colors opacity-0 group-hover:opacity-100"
-							onClick={(e) => {
-								e.stopPropagation();
-								onDeleteChat(session.id);
-							}}
-							title="Delete"
-						>
-							<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
-						</button>
-					</div>
-				))
-			)}
-		</div>,
-		document.body
-	);
+  const historyMenu =
+    isHistoryOpen &&
+    createPortal(
+      <div
+        id="history-menu"
+        className="fixed z-[9999] min-w-[220px] max-h-[300px] overflow-y-auto bg-menu-bg border border-menu-border rounded-lg shadow-[0_12px_24px_var(--color-shadow)]"
+        style={{
+          top: historyPosition.top,
+          left: historyPosition.left,
+          transform: "translateY(-100%)",
+        }}
+      >
+        {sessions.length === 0 ? (
+          <div className="px-3 py-2 text-xs text-foreground-subtle">No conversations</div>
+        ) : (
+          sessions.map((session) => (
+            <div
+              key={session.id}
+              className={`flex items-center justify-between group hover:bg-menu-selected-bg border-b border-menu-separator last:border-b-0 ${
+                session.id === currentSessionId ? "bg-menu-selected-bg" : ""
+              }`}
+            >
+              <button
+                type="button"
+                className={`flex-1 px-3 py-2 cursor-pointer transition-colors text-xs text-left ${
+                  session.id === currentSessionId ? "text-foreground" : "text-menu-foreground"
+                }`}
+                onClick={() => handleOpenFromHistory(session.id)}
+              >
+                <span className="truncate block">{session.name}</span>
+              </button>
+              <button
+                type="button"
+                className="flex-shrink-0 p-2 text-foreground-subtle hover:text-error transition-colors opacity-0 group-hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteChat(session.id);
+                }}
+                title="Delete"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+              </button>
+            </div>
+          ))
+        )}
+      </div>,
+      document.body,
+    );
 
-	const getCurrentModeLabel = () => {
-		const mode = modeOptions.find(m => m.value === (agentMode ? 'agent' : 'chat'));
-		return mode?.label || 'Chat';
-	};
+  const getCurrentModeLabel = () => {
+    const mode = modeOptions.find((m) => m.value === (agentMode ? "agent" : "chat"));
+    return mode?.label || "Chat";
+  };
 
-	const getCurrentApprovalLabel = () => {
-		const approval = approvalOptions.find(a => a.value === approvalMode);
-		return approval?.label || 'Auto';
-	};
+  const getCurrentApprovalLabel = () => {
+    const approval = approvalOptions.find((a) => a.value === approvalMode);
+    return approval?.label || "Auto";
+  };
 
-	const getCurrentModelLabel = () => {
-		return getModelLabel(selectedModel);
-	};
+  const getCurrentModelLabel = () => {
+    return getModelLabel(selectedModel);
+  };
 
-	const getCurrentModeIcon = () => {
-		return agentMode ? <AgentIcon /> : <ChatIcon />;
-	};
+  const getCurrentModeIcon = () => {
+    return agentMode ? <AgentIcon /> : <ChatIcon />;
+  };
 
-	const getCurrentApprovalIcon = () => {
-		switch (approvalMode) {
-			case 'ALL_APPROVE':
-				return <AllApproveIcon />;
-			case 'AUTO_APPROVE':
-				return <AutoApproveIcon />;
-			case 'SAFE_APPROVE':
-				return <SafeApproveIcon />;
-			case 'MANUAL_APPROVE':
-				return <ManualApproveIcon />;
-			default:
-				return <AutoApproveIcon />;
-		}
-	};
+  const getCurrentApprovalIcon = () => {
+    switch (approvalMode) {
+      case "ALL_APPROVE":
+        return <AllApproveIcon />;
+      case "AUTO_APPROVE":
+        return <AutoApproveIcon />;
+      case "SAFE_APPROVE":
+        return <SafeApproveIcon />;
+      case "MANUAL_APPROVE":
+        return <ManualApproveIcon />;
+      default:
+        return <AutoApproveIcon />;
+    }
+  };
 
-	const ChevronIcon = () => (
-		<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-		</svg>
-	);
+  const ChevronIcon = () => (
+    <svg
+      className="w-3.5 h-3.5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+  );
 
-	const settingsMenu = isSettingsOpen && createPortal(
-		<div
-			id="settings-menu"
-			className="fixed z-[9999] min-w-[200px] bg-menu-bg border border-menu-border rounded-lg shadow-[0_12px_24px_var(--color-shadow)]"
-			style={{
-				bottom: settingsPosition.bottom,
-				left: settingsPosition.left,
-			}}
-		>
-			{activeSubmenu === null ? (
-				<div className="py-1">
-					<button
-						type="button"
-						className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center justify-between text-menu-foreground"
-						onClick={() => setActiveSubmenu('mode')}
-					>
-						<div className="flex items-center gap-2">
-							{getCurrentModeIcon()}
-							<span>Mode: {getCurrentModeLabel()}</span>
-						</div>
-						<ChevronIcon />
-					</button>
-					{agentMode && (
-						<button
-							type="button"
-							className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center justify-between text-menu-foreground border-t border-menu-separator"
-							onClick={() => setActiveSubmenu('approval')}
-						>
-							<div className="flex items-center gap-2">
-								{getCurrentApprovalIcon()}
-								<span>Approval: {getCurrentApprovalLabel()}</span>
-							</div>
-							<ChevronIcon />
-						</button>
-					)}
-					<button
-						type="button"
-						className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center justify-between text-menu-foreground border-t border-menu-separator"
-						onClick={() => setActiveSubmenu('model')}
-					>
-						<span>Model: {getCurrentModelLabel()}</span>
-						<ChevronIcon />
-					</button>
-				</div>
-			) : activeSubmenu === 'mode' ? (
-				<div className="py-1">
-					<button
-						type="button"
-						className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left text-foreground-subtle flex items-center gap-2"
-						onClick={() => setActiveSubmenu(null)}
-					>
-						<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-						</svg>
-						<span>Back</span>
-					</button>
-					<div className="border-t border-menu-separator" />
-					{modeOptions.map((option) => (
-						<button
-							key={option.value}
-							type="button"
-							className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center gap-2 ${
-								(agentMode ? 'agent' : 'chat') === option.value ? 'bg-menu-selected-bg text-foreground' : 'text-menu-foreground'
-							}`}
-							onClick={() => {
-								onModeChange(option.value);
-								setActiveSubmenu(null);
-								setIsSettingsOpen(false);
-							}}
-						>
-							<span className="flex-shrink-0">{option.icon}</span>
-							<div className="flex-1">
-								<div className="font-medium">{option.label}</div>
-								<div className="text-[10px] text-foreground-subtle leading-tight mt-0.5">{option.description}</div>
-							</div>
-						</button>
-					))}
-				</div>
-			) : activeSubmenu === 'approval' ? (
-				<div className="py-1">
-					<button
-						type="button"
-						className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left text-foreground-subtle flex items-center gap-2"
-						onClick={() => setActiveSubmenu(null)}
-					>
-						<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-						</svg>
-						<span>Back</span>
-					</button>
-					<div className="border-t border-menu-separator" />
-					{approvalOptions.map((option) => (
-						<button
-							key={option.value}
-							type="button"
-							className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center gap-2 ${
-								approvalMode === option.value ? 'bg-menu-selected-bg text-foreground' : 'text-menu-foreground'
-							}`}
-							onClick={() => {
-								onApprovalChange(option.value);
-								setActiveSubmenu(null);
-								setIsSettingsOpen(false);
-							}}
-						>
-							<span className="flex-shrink-0">{option.icon}</span>
-							<div className="flex-1">
-								<div className="font-medium">{option.label}</div>
-								<div className="text-[10px] text-foreground-subtle leading-tight mt-0.5">{option.description}</div>
-							</div>
-						</button>
-					))}
-				</div>
-			) : activeSubmenu === 'model' ? (
-				<div className="py-1">
-					<button
-						type="button"
-						className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left text-foreground-subtle flex items-center gap-2"
-						onClick={() => setActiveSubmenu(null)}
-					>
-						<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-						</svg>
-						<span>Back</span>
-					</button>
-					<div className="border-t border-menu-separator" />
-					{modelOptions.map((option) => (
-						<button
-							key={option.value}
-							type="button"
-							className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left ${
-								selectedModel === option.value ? 'bg-menu-selected-bg text-foreground' : 'text-menu-foreground'
-							} ${option.locked ? 'opacity-60' : ''}`}
-							onClick={() => {
-								if (option.locked) {
-									if (!isLoggedIn) {
-										onLogin();
-									} else {
-										onOpenBilling();
-									}
-									setActiveSubmenu(null);
-									setIsSettingsOpen(false);
-									return;
-								}
-								onModelChange(option.value);
-								setActiveSubmenu(null);
-								setIsSettingsOpen(false);
-							}}
-						>
-							<div className="flex items-center justify-between">
-								<span className="font-medium">{option.label}</span>
-								{option.locked && (
-									<span className="flex items-center gap-1 text-[10px] text-foreground-subtle">
-										<svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-										</svg>
-										<span>{option.lockMessage}</span>
-									</span>
-								)}
-							</div>
-						</button>
-					))}
-				</div>
-			) : null}
-		</div>,
-		document.body
-	);
+  const settingsMenu =
+    isSettingsOpen &&
+    createPortal(
+      <div
+        id="settings-menu"
+        className="fixed z-[9999] min-w-[200px] bg-menu-bg border border-menu-border rounded-lg shadow-[0_12px_24px_var(--color-shadow)]"
+        style={{
+          bottom: settingsPosition.bottom,
+          left: settingsPosition.left,
+        }}
+      >
+        {activeSubmenu === null ? (
+          <div className="py-1">
+            <button
+              type="button"
+              className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center justify-between text-menu-foreground"
+              onClick={() => setActiveSubmenu("mode")}
+            >
+              <div className="flex items-center gap-2">
+                {getCurrentModeIcon()}
+                <span>Mode: {getCurrentModeLabel()}</span>
+              </div>
+              <ChevronIcon />
+            </button>
+            {agentMode && (
+              <button
+                type="button"
+                className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center justify-between text-menu-foreground border-t border-menu-separator"
+                onClick={() => setActiveSubmenu("approval")}
+              >
+                <div className="flex items-center gap-2">
+                  {getCurrentApprovalIcon()}
+                  <span>Approval: {getCurrentApprovalLabel()}</span>
+                </div>
+                <ChevronIcon />
+              </button>
+            )}
+            <button
+              type="button"
+              className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center justify-between text-menu-foreground border-t border-menu-separator"
+              onClick={() => setActiveSubmenu("model")}
+            >
+              <span>Model: {getCurrentModelLabel()}</span>
+              <ChevronIcon />
+            </button>
+          </div>
+        ) : activeSubmenu === "mode" ? (
+          <div className="py-1">
+            <button
+              type="button"
+              className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left text-foreground-subtle flex items-center gap-2"
+              onClick={() => setActiveSubmenu(null)}
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              <span>Back</span>
+            </button>
+            <div className="border-t border-menu-separator" />
+            {modeOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center gap-2 ${
+                  (agentMode ? "agent" : "chat") === option.value
+                    ? "bg-menu-selected-bg text-foreground"
+                    : "text-menu-foreground"
+                }`}
+                onClick={() => {
+                  onModeChange(option.value);
+                  setActiveSubmenu(null);
+                  setIsSettingsOpen(false);
+                }}
+              >
+                <span className="flex-shrink-0">{option.icon}</span>
+                <div className="flex-1">
+                  <div className="font-medium">{option.label}</div>
+                  <div className="text-[10px] text-foreground-subtle leading-tight mt-0.5">
+                    {option.description}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : activeSubmenu === "approval" ? (
+          <div className="py-1">
+            <button
+              type="button"
+              className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left text-foreground-subtle flex items-center gap-2"
+              onClick={() => setActiveSubmenu(null)}
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              <span>Back</span>
+            </button>
+            <div className="border-t border-menu-separator" />
+            {approvalOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left flex items-center gap-2 ${
+                  approvalMode === option.value
+                    ? "bg-menu-selected-bg text-foreground"
+                    : "text-menu-foreground"
+                }`}
+                onClick={() => {
+                  onApprovalChange(option.value);
+                  setActiveSubmenu(null);
+                  setIsSettingsOpen(false);
+                }}
+              >
+                <span className="flex-shrink-0">{option.icon}</span>
+                <div className="flex-1">
+                  <div className="font-medium">{option.label}</div>
+                  <div className="text-[10px] text-foreground-subtle leading-tight mt-0.5">
+                    {option.description}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : activeSubmenu === "model" ? (
+          <div className="py-1">
+            <button
+              type="button"
+              className="w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left text-foreground-subtle flex items-center gap-2"
+              onClick={() => setActiveSubmenu(null)}
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              <span>Back</span>
+            </button>
+            <div className="border-t border-menu-separator" />
+            {modelOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left ${
+                  selectedModel === option.value
+                    ? "bg-menu-selected-bg text-foreground"
+                    : "text-menu-foreground"
+                } ${option.locked ? "opacity-60" : ""}`}
+                onClick={() => {
+                  if (option.locked) {
+                    if (!isLoggedIn) {
+                      onLogin();
+                    } else {
+                      onOpenBilling();
+                    }
+                    setActiveSubmenu(null);
+                    setIsSettingsOpen(false);
+                    return;
+                  }
+                  onModelChange(option.value);
+                  setActiveSubmenu(null);
+                  setIsSettingsOpen(false);
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{option.label}</span>
+                  {option.locked && (
+                    <span className="flex items-center gap-1 text-[10px] text-foreground-subtle">
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                      <span>{option.lockMessage}</span>
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>,
+      document.body,
+    );
 
-	return (
-		<div className="p-2.5" ref={containerRef}>
-			<div className="bg-input-bg border border-input-border rounded-lg overflow-hidden">
-				<textarea
-					value={text}
-					onChange={handleTextChange}
-					onKeyDown={handleKeyDown}
-					placeholder="Plan, @ for context, / for commands"
-					rows={1}
-					disabled={isLoading}
-					className="w-full px-2.5 py-2 bg-transparent text-input-foreground resize-none min-h-[36px] max-h-[160px] text-xs leading-relaxed outline-none placeholder:text-input-placeholder disabled:opacity-50 disabled:cursor-not-allowed"
-				/>
-				<div className="flex items-center justify-between px-1.5 py-1 border-t border-input-border">
-					<div className="flex items-center gap-0.5">
-						<button
-							type="button"
-							ref={historyButtonRef}
-							onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-							className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all"
-							title="History"
-						>
-							<HistoryIcon />
-						</button>
-						<button
-							type="button"
-							onClick={onNewChat}
-							className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all"
-							title="New Chat"
-						>
-							<AddIcon />
-						</button>
-						<button
-							type="button"
-							ref={settingsButtonRef}
-							onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-							className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all"
-							title="Settings"
-						>
-							<SettingsIcon />
-						</button>
-						{usageData && (
-							<button
-								type="button"
-								onClick={onUsageClick}
-								className={`ml-1 px-1.5 py-0.5 text-[10px] rounded transition-all ${
-									getUsageColorClass(usageData)
-								}`}
-								title="View usage details"
-							>
-								{usageData.tier.charAt(0).toUpperCase() + usageData.tier.slice(1)} |{' '}
-								{usageData.usage.find(u => u.category === 'basic')?.used ?? 0}/
-								{usageData.usage.find(u => u.category === 'basic')?.limit ?? 0}
-							</button>
-						)}
-					</div>
-					<div className="flex items-center gap-0.5">
-						{agentRunning ? (
-							<button
-								type="button"
-								onClick={onStop}
-								className="p-1 text-error hover:text-error hover:bg-error-bg rounded transition-all"
-								title="Stop"
-							>
-								<svg
-									className="w-4 h-4"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-									aria-hidden="true"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M6 18L18 6M6 6l12 12"
-									/>
-								</svg>
-							</button>
-						) : (
-							<button
-								type="button"
-								onClick={handleSend}
-								disabled={isLoading || !text.trim()}
-								className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-								title="Send"
-							>
-								<svg
-									className="w-4 h-4"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-									aria-hidden="true"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M14 5l7 7m0 0l-7 7m7-7H3"
-									/>
-								</svg>
-							</button>
-						)}
-					</div>
-				</div>
-			</div>
-			{historyMenu}
-			{settingsMenu}
-		</div>
-	);
+  return (
+    <div className="p-2.5" ref={containerRef}>
+      <div className="bg-input-bg border border-input-border rounded-lg overflow-hidden">
+        <textarea
+          value={text}
+          onChange={handleTextChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Plan, @ for context, / for commands"
+          rows={1}
+          disabled={isLoading}
+          className="w-full px-2.5 py-2 bg-transparent text-input-foreground resize-none min-h-[36px] max-h-[160px] text-xs leading-relaxed outline-none placeholder:text-input-placeholder disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+        <div className="flex items-center justify-between px-1.5 py-1 border-t border-input-border">
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              ref={historyButtonRef}
+              onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+              className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all"
+              title="History"
+            >
+              <HistoryIcon />
+            </button>
+            <button
+              type="button"
+              onClick={onNewChat}
+              className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all"
+              title="New Chat"
+            >
+              <AddIcon />
+            </button>
+            <button
+              type="button"
+              ref={settingsButtonRef}
+              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+              className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all"
+              title="Settings"
+            >
+              <SettingsIcon />
+            </button>
+            {usageData && (
+              <button
+                type="button"
+                onClick={onUsageClick}
+                className={`ml-1 px-1.5 py-0.5 text-[10px] rounded transition-all ${getUsageColorClass(
+                  usageData,
+                )}`}
+                title="View usage details"
+              >
+                {usageData.tier.charAt(0).toUpperCase() + usageData.tier.slice(1)} |{" "}
+                {usageData.usage.find((u) => u.category === "basic")?.used ?? 0}/
+                {usageData.usage.find((u) => u.category === "basic")?.limit ?? 0}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-0.5">
+            {agentRunning ? (
+              <button
+                type="button"
+                onClick={onStop}
+                className="p-1 text-error hover:text-error hover:bg-error-bg rounded transition-all"
+                title="Stop"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={isLoading || !text.trim()}
+                className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Send"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M14 5l7 7m0 0l-7 7m7-7H3"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      {historyMenu}
+      {settingsMenu}
+    </div>
+  );
 }

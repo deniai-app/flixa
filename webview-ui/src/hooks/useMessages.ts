@@ -25,9 +25,9 @@ export function useMessages(): UseMessagesReturn {
 	const [currentSessionId, setCurrentSessionId] = useState('');
 	const [agentMode, setAgentMode] = useState(true);
 	const [approvalMode, setApprovalMode] = useState('AUTO_APPROVE');
-	const [selectedModel, setSelectedModel] = useState('openai/gpt-5.2-codex');
+	const [selectedModel, setSelectedModel] = useState('openai/gpt-5.3-codex');
 	const [availableModels, setAvailableModels] = useState<string[]>([
-		'openai/gpt-5.2-codex',
+		'openai/gpt-5.3-codex',
 	]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [agentRunning, setAgentRunning] = useState(false);
