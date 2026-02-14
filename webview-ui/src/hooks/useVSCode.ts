@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
 import { vscode } from '../vscode';
+import type { ImageAttachment } from '../types';
 
 export interface UseVSCodeReturn {
-	sendMessage: (text: string) => void;
+	sendMessage: (text: string, images?: ImageAttachment[]) => void;
 	toggleAgentMode: (enabled: boolean) => void;
 	setApprovalMode: (mode: string) => void;
 	setModel: (model: string) => void;
@@ -17,8 +18,8 @@ export interface UseVSCodeReturn {
 }
 
 export function useVSCode(): UseVSCodeReturn {
-	const sendMessage = useCallback((text: string) => {
-		vscode.postMessage({ type: 'sendMessage', message: text });
+	const sendMessage = useCallback((text: string, images?: ImageAttachment[]) => {
+		vscode.postMessage({ type: 'sendMessage', message: text, images });
 	}, []);
 
 	const toggleAgentMode = useCallback((enabled: boolean) => {

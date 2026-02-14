@@ -7,9 +7,17 @@ export interface ActionResult {
   error?: string;
 }
 
+export interface ImageAttachment {
+  id: string;
+  data: string;
+  mimeType: string;
+  name?: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'result' | 'executing';
   content: string;
+  images?: ImageAttachment[];
   results?: ActionResult[];
   executingAction?: string;
   executingOutput?: string;

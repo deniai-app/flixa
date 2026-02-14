@@ -1,6 +1,6 @@
-import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type KeyboardEvent, type ClipboardEvent, type DragEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ChatSession, UsageData, Tier } from "../types";
+import type { ChatSession, UsageData, Tier, ImageAttachment } from "../types";
 import { getModelTierRequirement, canUseTier } from "../types";
 
 interface InputAreaProps {
@@ -16,8 +16,10 @@ interface InputAreaProps {
   isLoading: boolean;
   agentRunning: boolean;
   text: string;
+  images: ImageAttachment[];
   onTextChange: (text: string) => void;
-  onSendMessage: (text: string) => void;
+  onImagesChange: (images: ImageAttachment[] | ((prev: ImageAttachment[]) => ImageAttachment[])) => void;
+  onSendMessage: (text: string, images: ImageAttachment[]) => void;
   onModeChange: (mode: string) => void;
   onApprovalChange: (mode: string) => void;
   onModelChange: (model: string) => void;
@@ -175,7 +177,6 @@ const approvalOptions = [
 
 const getModelLabel = (model: string): string => {
   const labels: Record<string, string> = {
-    "openai/gpt-5.3-codex": "GPT-5.3 Codex",
     "openai/gpt-5.2-codex": "GPT-5.2 Codex",
     "openai/gpt-5.2": "GPT-5.2",
     "anthropic/claude-sonnet-4.5": "Sonnet 4.5",
@@ -243,7 +244,9 @@ export function InputArea({
   isLoading,
   agentRunning,
   text,
+  images,
   onTextChange,
+  onImagesChange,
   onSendMessage,
   onModeChange,
   onApprovalChange,
@@ -349,9 +352,10 @@ export function InputArea({
   };
 
   const handleSend = () => {
-    if (text.trim() && !isLoading) {
-      onSendMessage(text);
+    if ((text.trim() || images.length > 0) && !isLoading) {
+      onSendMessage(text, images);
       onTextChange("");
+      onImagesChange([]);
     }
   };
 
@@ -359,6 +363,78 @@ export function InputArea({
     onTextChange(e.target.value);
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px";
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const processFiles = (files: FileList | File[]) => {
+    const imageFiles = Array.from(files).filter((file) =>
+      file.type.startsWith("image/")
+    );
+    if (imageFiles.length === 0) return;
+
+    const newImages: ImageAttachment[] = [];
+    let loadedCount = 0;
+
+    for (const file of imageFiles) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        newImages.push({
+          id: crypto.randomUUID(),
+          data: dataUrl,
+          mimeType: file.type,
+          name: file.name,
+        });
+        loadedCount++;
+        if (loadedCount === imageFiles.length) {
+          onImagesChange((prev) => [...prev, ...newImages]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageItems = Array.from(items).filter((item) =>
+      item.type.startsWith("image/")
+    );
+    if (imageItems.length === 0) return;
+
+    e.preventDefault();
+    const files: File[] = [];
+    for (const item of imageItems) {
+      const file = item.getAsFile();
+      if (file) files.push(file);
+    }
+    processFiles(files);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const files = e.dataTransfer?.files;
+    if (files) processFiles(files);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleRemoveImage = (id: string) => {
+    onImagesChange((prev) => prev.filter((img) => img.id !== id));
+  };
+
+  const handleImageButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) processFiles(files);
+    e.target.value = "";
   };
 
   const historyMenu =
@@ -693,15 +769,51 @@ export function InputArea({
 
   return (
     <div className="p-2.5" ref={containerRef}>
-      <div className="bg-input-bg border border-input-border rounded-lg overflow-hidden">
+      <div
+        className="bg-input-bg border border-input-border rounded-lg overflow-hidden"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      >
+        {images.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-2.5 pt-2">
+            {images.map((img) => (
+              <div key={img.id} className="relative group">
+                <img
+                  src={img.data}
+                  alt={img.name || "Attached image"}
+                  className="h-16 w-16 object-cover rounded-md border border-input-border"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleRemoveImage(img.id)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-error text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove image"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <textarea
           value={text}
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder="Plan, @ for context, / for commands"
           rows={1}
           disabled={isLoading}
           className="w-full px-2.5 py-2 bg-transparent text-input-foreground resize-none min-h-[36px] max-h-[160px] text-xs leading-relaxed outline-none placeholder:text-input-placeholder disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileInputChange}
+          className="hidden"
         />
         <div className="flex items-center justify-between px-1.5 py-1 border-t border-input-border">
           <div className="flex items-center gap-0.5">
@@ -721,6 +833,16 @@ export function InputArea({
               title="New Chat"
             >
               <AddIcon />
+            </button>
+            <button
+              type="button"
+              onClick={handleImageButtonClick}
+              className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all"
+              title="Attach Image"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
             </button>
             <button
               type="button"
@@ -773,7 +895,7 @@ export function InputArea({
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={isLoading || !text.trim()}
+                disabled={isLoading || (!text.trim() && images.length === 0)}
                 className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Send"
               >

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { InputArea } from './components/InputArea';
 import { MessageList } from './components/MessageList';
 import { useMessages, useVSCode } from './hooks';
+import type { ImageAttachment } from './types';
 
 export default function App() {
 	const {
@@ -39,6 +40,7 @@ export default function App() {
 
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const [inputText, setInputText] = useState('');
+	const [inputImages, setInputImages] = useState<ImageAttachment[]>([]);
 
 	useEffect(() => {
 		ready();
@@ -48,10 +50,11 @@ export default function App() {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	});
 
-	const handleSendMessage = (text: string) => {
-		if (!text.trim() || isLoading) return;
-		sendMessage(text);
+	const handleSendMessage = (text: string, images: ImageAttachment[]) => {
+		if ((!text.trim() && images.length === 0) || isLoading) return;
+		sendMessage(text, images);
 		setInputText('');
+		setInputImages([]);
 	};
 
 	const handleModeChange = (mode: string) => {
@@ -119,7 +122,9 @@ export default function App() {
 				isLoading={isLoading}
 				agentRunning={agentRunning}
 				text={inputText}
+				images={inputImages}
 				onTextChange={setInputText}
+				onImagesChange={setInputImages}
 				onSendMessage={handleSendMessage}
 				onModeChange={handleModeChange}
 				onApprovalChange={handleApprovalChange}

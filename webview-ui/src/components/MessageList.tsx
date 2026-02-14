@@ -1,9 +1,9 @@
-import { useId, type RefObject } from 'react';
-import type { ChatMessage } from '../types';
-import { Message } from './Message';
-import { ExecutingMessage } from './ExecutingMessage';
-import { ResultMessage } from './ResultMessage';
-import { MarkdownContent } from './MarkdownContent';
+import { useId, type RefObject } from "react";
+import type { ChatMessage } from "../types";
+import { Message } from "./Message";
+import { ExecutingMessage } from "./ExecutingMessage";
+import { ResultMessage } from "./ResultMessage";
+import { MarkdownContent } from "./MarkdownContent";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -13,18 +13,45 @@ interface MessageListProps {
 }
 
 const FlixaLogo = () => (
-  <svg className="w-12 h-12 text-foreground-subtle/30" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+  <svg
+    className="w-12 h-12 text-foreground-subtle/30"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.5}
+      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+    />
   </svg>
 );
 
 const AssistantIcon = () => (
-  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+  <svg
+    className="w-3.5 h-3.5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+    />
   </svg>
 );
 
-export function MessageList({ messages, isLoading, streamingText, messagesEndRef }: MessageListProps) {
+export function MessageList({
+  messages,
+  isLoading,
+  streamingText,
+  messagesEndRef,
+}: MessageListProps) {
   const idPrefix = useId();
 
   if (messages.length === 0 && !isLoading) {
@@ -43,10 +70,10 @@ export function MessageList({ messages, isLoading, streamingText, messagesEndRef
     <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
       {messages.map((msg, idx) => {
         const key = `${idPrefix}-${msg.role}-${idx}`;
-        if (msg.role === 'executing' && msg.executingAction) {
+        if (msg.role === "executing" && msg.executingAction) {
           return <ExecutingMessage key={key} message={msg} />;
         }
-        if (msg.role === 'result' && msg.results) {
+        if (msg.role === "result" && msg.results) {
           return <ResultMessage key={key} results={msg.results} />;
         }
         return <Message key={key} message={msg} />;
@@ -60,7 +87,7 @@ export function MessageList({ messages, isLoading, streamingText, messagesEndRef
               </div>
               <span className="text-[10px] font-medium uppercase tracking-wide">Flixa</span>
             </div>
-            <div className="px-3.5 py-2.5 bg-surface-2 rounded-2xl rounded-tl-sm min-w-0 [word-break:break-word]">
+            <div className="min-w-0 mt-2 ml-2 [word-break:break-word]">
               {streamingText ? (
                 <div className="text-[13px] text-foreground leading-relaxed">
                   <MarkdownContent content={streamingText} />
