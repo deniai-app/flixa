@@ -7,6 +7,11 @@ export interface ActionResult {
   error?: string;
 }
 
+export interface FileChange {
+  filePath: string;
+  status: 'modified' | 'created' | 'deleted';
+}
+
 export interface ImageAttachment {
   id: string;
   data: string;
@@ -29,6 +34,16 @@ export interface ChatSession {
 }
 
 export type Tier = 'free' | 'plus' | 'pro';
+export type ModelTierRequirement = 'free' | 'plus' | 'pro';
+
+export interface ModelDefinition {
+  id: string;
+  label?: string;
+  description?: string;
+  tags?: string[];
+  premium?: boolean;
+  tier?: ModelTierRequirement;
+}
 
 export interface UsageItem {
   category: 'basic' | 'premium';
@@ -59,26 +74,6 @@ export interface AppState {
   agentRunning: boolean;
   usageData: UsageData | null;
   isLoggedIn: boolean;
-}
-
-export type ModelTierRequirement = 'free' | 'plus' | 'pro';
-
-export const PLUS_MODELS = ['anthropic/claude-sonnet-4.5'];
-
-export const PRO_MODELS = [
-  'anthropic/claude-opus-4.5',
-  'anthropic/claude-opus-4.6',
-  'google/gemini-3-pro-preview',
-];
-
-export function getModelTierRequirement(model: string): ModelTierRequirement {
-  if (PRO_MODELS.includes(model)) {
-    return 'pro';
-  }
-  if (PLUS_MODELS.includes(model)) {
-    return 'plus';
-  }
-  return 'free';
 }
 
 export function canUseTier(userTier: Tier | null, requiredTier: ModelTierRequirement): boolean {

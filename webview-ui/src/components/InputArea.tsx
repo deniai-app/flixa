@@ -1,7 +1,22 @@
-import { type ChangeEvent, type KeyboardEvent, type ClipboardEvent, type DragEvent, useEffect, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  type ClipboardEvent,
+  type DragEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
-import type { ChatSession, UsageData, Tier, ImageAttachment } from "../types";
-import { getModelTierRequirement, canUseTier } from "../types";
+import type {
+  ChatSession,
+  UsageData,
+  Tier,
+  ImageAttachment,
+  ModelDefinition,
+  ModelTierRequirement,
+} from "../types";
+import { canUseTier } from "../types";
 
 interface InputAreaProps {
   sessions: ChatSession[];
@@ -13,12 +28,15 @@ interface InputAreaProps {
   approvalMode: string;
   selectedModel: string;
   availableModels: string[];
+  modelDefinitions: ModelDefinition[];
   isLoading: boolean;
   agentRunning: boolean;
   text: string;
   images: ImageAttachment[];
   onTextChange: (text: string) => void;
-  onImagesChange: (images: ImageAttachment[] | ((prev: ImageAttachment[]) => ImageAttachment[])) => void;
+  onImagesChange: (
+    images: ImageAttachment[] | ((prev: ImageAttachment[]) => ImageAttachment[]),
+  ) => void;
   onSendMessage: (text: string, images: ImageAttachment[]) => void;
   onModeChange: (mode: string) => void;
   onApprovalChange: (mode: string) => void;
@@ -175,19 +193,6 @@ const approvalOptions = [
   },
 ];
 
-const getModelLabel = (model: string): string => {
-  const labels: Record<string, string> = {
-    "openai/gpt-5.2-codex": "GPT-5.2 Codex",
-    "openai/gpt-5.2": "GPT-5.2",
-    "anthropic/claude-sonnet-4.5": "Sonnet 4.5",
-    "anthropic/claude-opus-4.6": "Opus 4.6",
-    "glm-4.6": "GLM-4.6",
-    "grok-code-fast-1": "Grok Code",
-    "google/gemini-3-pro-preview": "Gemini 3 Pro",
-    "google/gemini-3-flash-preview": "Gemini 3 Flash",
-  };
-  return labels[model] || model;
-};
 
 const getUsageColorClass = (usageData: UsageData): string => {
   const basic = usageData.usage.find((u) => u.category === "basic");
@@ -206,31 +211,6 @@ const getUsageColorClass = (usageData: UsageData): string => {
   return "bg-surface-hover text-foreground-subtle hover:text-foreground";
 };
 
-const isModelLocked = (model: string, tier: Tier | null, isLoggedIn: boolean): boolean => {
-  if (!isLoggedIn) {
-    return true;
-  }
-  if (!tier) {
-    return true;
-  }
-  const required = getModelTierRequirement(model);
-  return !canUseTier(tier, required);
-};
-
-const getModelLockMessage = (model: string, isLoggedIn: boolean): string => {
-  if (!isLoggedIn) {
-    return "Login required";
-  }
-  const required = getModelTierRequirement(model);
-  if (required === "pro") {
-    return "Pro plan required";
-  }
-  if (required === "plus") {
-    return "Plus plan or higher required";
-  }
-  return "";
-};
-
 export function InputArea({
   sessions,
   currentSessionId,
@@ -241,6 +221,7 @@ export function InputArea({
   approvalMode,
   selectedModel,
   availableModels,
+  modelDefinitions,
   isLoading,
   agentRunning,
   text,
@@ -267,16 +248,77 @@ export function InputArea({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const [settingsPosition, setSettingsPosition] = useState({ bottom: 0, left: 0 });
+  const [modelSearch, setModelSearch] = useState("");
 
   const userTier = usageData?.tier ?? null;
+  const getModelDefinition = (modelId: string): ModelDefinition | undefined => {
+    return modelDefinitions.find((model) => model.id === modelId);
+  };
+  const getModelLabel = (modelId: string): string => {
+    const definition = getModelDefinition(modelId);
+    return definition?.label ?? modelId;
+  };
+  const getModelTierRequirement = (modelId: string): ModelTierRequirement => {
+    const definition = getModelDefinition(modelId);
+    return definition?.tier ?? "free";
+  };
+  const isModelLocked = (model: string, tier: Tier | null, loggedIn: boolean): boolean => {
+    if (!loggedIn) {
+      return true;
+    }
+    if (!tier) {
+      return true;
+    }
+    const required = getModelTierRequirement(model);
+    return !canUseTier(tier, required);
+  };
+  const getModelLockMessage = (model: string, loggedIn: boolean): string => {
+    if (!loggedIn) {
+      return "Login required";
+    }
+    const required = getModelTierRequirement(model);
+    if (required === "pro") {
+      return "Pro plan required";
+    }
+    if (required === "plus") {
+      return "Plus plan or higher required";
+    }
+    return "";
+  };
 
-  const modelOptions = availableModels.map((model) => ({
-    value: model,
-    label: getModelLabel(model),
-    description: "",
-    locked: isModelLocked(model, userTier, isLoggedIn),
-    lockMessage: getModelLockMessage(model, isLoggedIn),
-  }));
+  const modelOptions = availableModels.map((model) => {
+    const def = getModelDefinition(model);
+    return {
+      value: model,
+      label: getModelLabel(model),
+      description: def?.description ?? "",
+      tags: def?.tags ?? [],
+      locked: isModelLocked(model, userTier, isLoggedIn),
+      lockMessage: getModelLockMessage(model, isLoggedIn),
+    };
+  });
+  const normalizedModelSearch = modelSearch.trim().toLowerCase();
+  const filteredModelOptions = modelOptions.filter((option) => {
+    if (!normalizedModelSearch) {
+      return true;
+    }
+    return (
+      option.label.toLowerCase().includes(normalizedModelSearch) ||
+      option.value.toLowerCase().includes(normalizedModelSearch) ||
+      option.description.toLowerCase().includes(normalizedModelSearch) ||
+      option.tags.some((tag) => tag.toLowerCase().includes(normalizedModelSearch))
+    );
+  });
+  const getModelTooltip = (option: { description: string; tags: string[] }): string => {
+    const parts: string[] = [];
+    if (option.description) {
+      parts.push(option.description);
+    }
+    if (option.tags.length > 0) {
+      parts.push(`Tags: ${option.tags.join(", ")}`);
+    }
+    return parts.join("\n");
+  };
 
   useEffect(() => {
     const checkWidth = () => {
@@ -368,9 +410,7 @@ export function InputArea({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFiles = (files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter((file) =>
-      file.type.startsWith("image/")
-    );
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
     if (imageFiles.length === 0) return;
 
     const newImages: ImageAttachment[] = [];
@@ -399,9 +439,7 @@ export function InputArea({
     const items = e.clipboardData?.items;
     if (!items) return;
 
-    const imageItems = Array.from(items).filter((item) =>
-      item.type.startsWith("image/")
-    );
+    const imageItems = Array.from(items).filter((item) => item.type.startsWith("image/"));
     if (imageItems.length === 0) return;
 
     e.preventDefault();
@@ -712,55 +750,71 @@ export function InputArea({
               <span>Back</span>
             </button>
             <div className="border-t border-menu-separator" />
-            {modelOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left ${
-                  selectedModel === option.value
-                    ? "bg-menu-selected-bg text-foreground"
-                    : "text-menu-foreground"
-                } ${option.locked ? "opacity-60" : ""}`}
-                onClick={() => {
-                  if (option.locked) {
-                    if (!isLoggedIn) {
-                      onLogin();
-                    } else {
-                      onOpenBilling();
-                    }
-                    setActiveSubmenu(null);
-                    setIsSettingsOpen(false);
-                    return;
-                  }
-                  onModelChange(option.value);
-                  setActiveSubmenu(null);
-                  setIsSettingsOpen(false);
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{option.label}</span>
-                  {option.locked && (
-                    <span className="flex items-center gap-1 text-[10px] text-foreground-subtle">
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        />
-                      </svg>
-                      <span>{option.lockMessage}</span>
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
+            <div className="px-3 py-2">
+              <input
+                type="text"
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+                placeholder="Search models"
+                className="w-full px-2 py-1 text-xs rounded border border-menu-border bg-input-bg text-input-foreground placeholder:text-input-placeholder outline-none"
+              />
+            </div>
+            <div className="max-h-[280px] overflow-y-auto">
+              {filteredModelOptions.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-foreground-subtle">No models found</div>
+              ) : (
+                filteredModelOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    title={getModelTooltip(option)}
+                    className={`w-full px-3 py-2 cursor-pointer transition-colors hover:bg-menu-selected-bg text-xs text-left ${
+                      selectedModel === option.value
+                        ? "bg-menu-selected-bg text-foreground"
+                        : "text-menu-foreground"
+                    } ${option.locked ? "opacity-60" : ""}`}
+                    onClick={() => {
+                      if (option.locked) {
+                        if (!isLoggedIn) {
+                          onLogin();
+                        } else {
+                          onOpenBilling();
+                        }
+                        setActiveSubmenu(null);
+                        setIsSettingsOpen(false);
+                        return;
+                      }
+                      onModelChange(option.value);
+                      setActiveSubmenu(null);
+                      setIsSettingsOpen(false);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{option.label}</span>
+                      {option.locked && (
+                        <span className="flex items-center gap-1 text-[10px] text-foreground-subtle">
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                            />
+                          </svg>
+                          <span>{option.lockMessage}</span>
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         ) : null}
       </div>,
@@ -790,7 +844,12 @@ export function InputArea({
                   title="Remove image"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -840,8 +899,19 @@ export function InputArea({
               className="p-1 text-foreground-subtle hover:text-foreground hover:bg-surface-hover rounded transition-all"
               title="Attach Image"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
               </svg>
             </button>
             <button

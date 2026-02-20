@@ -183,7 +183,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!usageService) {
         return;
       }
-      await usageService.loginWithDeviceAuth();
+      const loggedIn = await usageService.loginWithDeviceAuth();
+      if (loggedIn && chatViewProvider) {
+        await chatViewProvider.refreshState();
+      }
     }
   );
   context.subscriptions.push(loginCommand);

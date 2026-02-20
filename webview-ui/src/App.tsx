@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { InputArea } from './components/InputArea';
 import { MessageList } from './components/MessageList';
+import { FilesChanged } from './components/FilesChanged';
 import { useMessages, useVSCode } from './hooks';
 import type { ImageAttachment } from './types';
 
@@ -13,11 +14,13 @@ export default function App() {
 		approvalMode,
 		selectedModel,
 		availableModels,
+		modelDefinitions,
 		isLoading,
 		agentRunning,
 		streamingText,
 		usageData,
 		isLoggedIn,
+		changedFiles,
 		setAgentMode,
 		setApprovalMode,
 		setSelectedModel,
@@ -111,6 +114,7 @@ export default function App() {
 				streamingText={streamingText}
 				messagesEndRef={messagesEndRef}
 			/>
+			<FilesChanged files={changedFiles} />
 			<InputArea
 				agentMode={agentMode}
 				sessions={sessions}
@@ -119,6 +123,7 @@ export default function App() {
 				approvalMode={approvalMode}
 				selectedModel={selectedModel}
 				availableModels={availableModels}
+				modelDefinitions={modelDefinitions}
 				isLoading={isLoading}
 				agentRunning={agentRunning}
 				text={inputText}

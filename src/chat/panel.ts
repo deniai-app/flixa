@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { executeAgentActions } from '../agent/executor';
 import { showDiffPreview } from '../diff/preview';
 import { applyDiffToContent, validateDiff } from '../diff/validator';
 import { callLLMForAgent, callLLMForChat, generateSessionTitle } from '../llm/stub';
-import { getAvailableModels, getModel, setModel } from '../llm/provider';
+import { getAvailableModels, getModel, getModelDefinitions, setModel } from '../llm/provider';
 import type {
 	ActionExecutionResult,
 	AgentAction,
@@ -19,7 +21,14 @@ import { gatherChatContext } from './context';
 import { SessionManager, type ChatMessage, type ChatSession } from './session';
 import { getWebviewHtml } from './webview';
 import type { UsageService } from '../usage/service';
-import { PREMIUM_MODELS, type UsageCategory } from '../usage/types';
+import { isPremiumModel, type UsageCategory } from '../usage/types';
+
+interface TrackedFile {
+	filePath: string;
+	originalContent: string | null;
+	status: 'modified' | 'created' | 'deleted';
+	createdDirs: string[];
+}
 
 const MAX_AGENT_ITERATIONS = Infinity;
 
@@ -37,6 +46,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	private _stopRequested: boolean = false;
 	private _currentAbortController?: AbortController;
 	private _usageService?: UsageService;
+	private _changedFiles: Map<string, TrackedFile> = new Map();
 
 	constructor(
 		extensionUri: vscode.Uri,
@@ -80,6 +90,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				this._updateState();
 				this._updateMessages();
 				this._updateSessions();
+				this._sendChangedFiles();
 				if (this._usageService) {
 					this.updateUsage(this._usageService.getCachedUsage());
 				}
@@ -99,8 +110,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				this._currentAbortController?.abort();
 			} else if (data.type === 'newChat') {
 				this._sessionManager.createNewSession();
+				this._changedFiles.clear();
 				this._updateMessages();
 				this._updateSessions();
+				this._sendChangedFiles();
 			} else if (data.type === 'switchChat') {
 				this._sessionManager.currentSessionId = data.sessionId;
 				this._updateMessages();
@@ -118,6 +131,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 					const billingUrl = this._usageService.getBillingUrl();
 					vscode.env.openExternal(vscode.Uri.parse(billingUrl));
 				}
+			} else if (data.type === 'openFile') {
+				const workspaceFolders = vscode.workspace.workspaceFolders;
+				if (workspaceFolders && data.filePath) {
+					const fileUri = vscode.Uri.joinPath(workspaceFolders[0].uri, data.filePath);
+					try {
+						await vscode.window.showTextDocument(fileUri, { preview: true });
+					} catch { }
+				}
+			} else if (data.type === 'revertFile') {
+				await this._revertFile(data.filePath);
+			} else if (data.type === 'keepFile') {
+				this._keepFile(data.filePath);
+			} else if (data.type === 'keepAll') {
+				this._keepAll();
 			}
 		});
 	}
@@ -138,6 +165,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
 	public getApprovalMode(): ApprovalMode {
 		return this._approvalMode;
+	}
+
+	public async refreshState(): Promise<void> {
+		await this._updateState();
 	}
 
 	private _setLoading(loading: boolean): void {
@@ -176,7 +207,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		const isFirstMessage = currentSession && currentSession.messages.length === 0;
 
 		const currentModel = getModel();
-		const usageCategory: UsageCategory = PREMIUM_MODELS.includes(currentModel)
+		const usageCategory: UsageCategory = isPremiumModel(currentModel)
 			? 'premium'
 			: 'basic';
 
@@ -250,6 +281,165 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			this._view.webview.postMessage({
 				type: 'streamingUpdate',
 				text,
+			});
+		} catch { }
+	}
+
+	private _getFilePathFromAction(action: AgentAction): string | null {
+		switch (action.type) {
+			case 'writeFile':
+			case 'editFile':
+			case 'deleteFile':
+			case 'diff':
+				return action.filePath;
+			case 'search_replace':
+				return action.file_path;
+			case 'edit_file':
+			case 'delete_file':
+				return action.target_file;
+			default:
+				return null;
+		}
+	}
+
+	private _resolveFilePath(filePath: string): string {
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		if (!workspaceFolders) {
+			return filePath;
+		}
+		const root = workspaceFolders[0].uri.fsPath;
+		if (path.isAbsolute(filePath)) {
+			return filePath;
+		}
+		return path.join(root, filePath);
+	}
+
+	private _getRelativePath(absolutePath: string): string {
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		if (!workspaceFolders) {
+			return absolutePath;
+		}
+		const root = workspaceFolders[0].uri.fsPath;
+		if (absolutePath.startsWith(root)) {
+			return absolutePath.substring(root.length + 1).replace(/\\/g, '/');
+		}
+		return absolutePath.replace(/\\/g, '/');
+	}
+
+	private _captureOriginalContents(actions: AgentAction[]): void {
+		for (const action of actions) {
+			const filePath = this._getFilePathFromAction(action);
+			if (!filePath) {
+				continue;
+			}
+			const absolutePath = this._resolveFilePath(filePath);
+			const relativePath = this._getRelativePath(absolutePath);
+			if (this._changedFiles.has(relativePath)) {
+				continue;
+			}
+			try {
+				const content = fs.readFileSync(absolutePath, 'utf-8');
+				this._changedFiles.set(relativePath, {
+					filePath: relativePath,
+					originalContent: content,
+					status: 'modified',
+					createdDirs: [],
+				});
+			} catch {
+				const createdDirs: string[] = [];
+				let dir = path.dirname(absolutePath);
+				const workspaceFolders = vscode.workspace.workspaceFolders;
+				const root = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
+				while (dir && dir !== root && dir !== path.dirname(dir)) {
+					if (!fs.existsSync(dir)) {
+						createdDirs.unshift(dir);
+					} else {
+						break;
+					}
+					dir = path.dirname(dir);
+				}
+				this._changedFiles.set(relativePath, {
+					filePath: relativePath,
+					originalContent: null,
+					status: 'created',
+					createdDirs,
+				});
+			}
+		}
+	}
+
+	private _updateTrackedStatuses(results: ActionExecutionResult[]): void {
+		for (const result of results) {
+			if (!result.success || result.rejected) {
+				continue;
+			}
+			const filePath = this._getFilePathFromAction(result.action);
+			if (!filePath) {
+				continue;
+			}
+			const absolutePath = this._resolveFilePath(filePath);
+			const relativePath = this._getRelativePath(absolutePath);
+			const tracked = this._changedFiles.get(relativePath);
+			if (!tracked) {
+				continue;
+			}
+			if (result.action.type === 'deleteFile' || result.action.type === 'delete_file') {
+				tracked.status = 'deleted';
+			}
+		}
+	}
+
+	private async _revertFile(relativePath: string): Promise<void> {
+		const tracked = this._changedFiles.get(relativePath);
+		if (!tracked) {
+			return;
+		}
+		const absolutePath = this._resolveFilePath(relativePath);
+		try {
+			if (tracked.originalContent === null) {
+				await vscode.workspace.fs.delete(vscode.Uri.file(absolutePath));
+				for (let i = tracked.createdDirs.length - 1; i >= 0; i--) {
+					const dir = tracked.createdDirs[i];
+					try {
+						const entries = fs.readdirSync(dir);
+						if (entries.length === 0) {
+							fs.rmdirSync(dir);
+						}
+					} catch { break; }
+				}
+			} else {
+				await vscode.workspace.fs.writeFile(
+					vscode.Uri.file(absolutePath),
+					Buffer.from(tracked.originalContent, 'utf-8')
+				);
+			}
+			this._changedFiles.delete(relativePath);
+			this._sendChangedFiles();
+		} catch { }
+	}
+
+	private _keepFile(relativePath: string): void {
+		this._changedFiles.delete(relativePath);
+		this._sendChangedFiles();
+	}
+
+	private _keepAll(): void {
+		this._changedFiles.clear();
+		this._sendChangedFiles();
+	}
+
+	private _sendChangedFiles(): void {
+		if (!this._view) {
+			return;
+		}
+		const files = Array.from(this._changedFiles.values()).map((f) => ({
+			filePath: f.filePath,
+			status: f.status,
+		}));
+		try {
+			this._view.webview.postMessage({
+				type: 'updateChangedFiles',
+				files,
 			});
 		} catch { }
 	}
@@ -409,6 +599,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				let results: ActionExecutionResult[];
 				const actionAbortController = new AbortController();
 				this._currentAbortController = actionAbortController;
+
+				this._captureOriginalContents(agentResponse.actions);
+
 				try {
 					results = await executeAgentActions({
 						actions: agentResponse.actions,
@@ -433,6 +626,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				}
 				console.log('[Flixa] execute actions done', results.length);
 
+				this._updateTrackedStatuses(results);
+
 				this._sessionManager.filterMessages((m) => m.role !== 'executing');
 
 				const serializedResults: SerializedActionResult[] = results.map(
@@ -454,6 +649,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				this._updateMessages();
 			}
 		} finally {
+			this._sendChangedFiles();
 			this._setAgentRunning(false);
 		}
 	}
@@ -576,12 +772,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		}
 		try {
 			const isLoggedIn = this._usageService ? await this._usageService.isLoggedIn() : false;
+			const availableModels = await getAvailableModels();
+			const modelDefinitions = getModelDefinitions();
 			this._view.webview.postMessage({
 				type: 'updateState',
 				agentMode: this._agentMode,
 				approvalMode: this._approvalMode,
 				selectedModel: getModel(),
-				availableModels: getAvailableModels(),
+				availableModels,
+				modelDefinitions,
 				isLoggedIn,
 			});
 		} catch { }

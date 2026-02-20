@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { ChatMessage, ChatSession, UsageData } from '../types';
+import { DEFAULT_MODEL } from '../constants';
+import type { ChatMessage, ChatSession, FileChange, ModelDefinition, UsageData } from '../types';
 
 export interface UseMessagesReturn {
 	messages: ChatMessage[];
@@ -9,11 +10,13 @@ export interface UseMessagesReturn {
 	approvalMode: string;
 	selectedModel: string;
 	availableModels: string[];
+	modelDefinitions: ModelDefinition[];
 	isLoading: boolean;
 	agentRunning: boolean;
 	streamingText: string;
 	usageData: UsageData | null;
 	isLoggedIn: boolean;
+	changedFiles: FileChange[];
 	setAgentMode: (mode: boolean) => void;
 	setApprovalMode: (mode: string) => void;
 	setSelectedModel: (model: string) => void;
@@ -25,15 +28,17 @@ export function useMessages(): UseMessagesReturn {
 	const [currentSessionId, setCurrentSessionId] = useState('');
 	const [agentMode, setAgentMode] = useState(true);
 	const [approvalMode, setApprovalMode] = useState('AUTO_APPROVE');
-	const [selectedModel, setSelectedModel] = useState('openai/gpt-5.2-codex');
-	const [availableModels, setAvailableModels] = useState<string[]>([
-		'openai/gpt-5.2-codex',
+	const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+	const [availableModels, setAvailableModels] = useState<string[]>([DEFAULT_MODEL]);
+	const [modelDefinitions, setModelDefinitions] = useState<ModelDefinition[]>([
+		{ id: DEFAULT_MODEL, label: 'GPT-5.2 Codex', description: '', tags: [], tier: 'free' },
 	]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [agentRunning, setAgentRunning] = useState(false);
 	const [streamingText, setStreamingText] = useState('');
 	const [usageData, setUsageData] = useState<UsageData | null>(null);
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
+	const [changedFiles, setChangedFiles] = useState<FileChange[]>([]);
 
 	useEffect(() => {
 		const handleMessage = (event: MessageEvent) => {
@@ -50,6 +55,9 @@ export function useMessages(): UseMessagesReturn {
 					}
 					if (data.availableModels) {
 						setAvailableModels(data.availableModels);
+					}
+					if (data.modelDefinitions) {
+						setModelDefinitions(data.modelDefinitions);
 					}
 					if (data.isLoggedIn !== undefined) {
 						setIsLoggedIn(data.isLoggedIn);
@@ -72,6 +80,9 @@ export function useMessages(): UseMessagesReturn {
 						setIsLoggedIn(data.isLoggedIn);
 					}
 					break;
+				case 'updateChangedFiles':
+					setChangedFiles(data.files || []);
+					break;
 			}
 		};
 
@@ -87,11 +98,13 @@ export function useMessages(): UseMessagesReturn {
 		approvalMode,
 		selectedModel,
 		availableModels,
+		modelDefinitions,
 		isLoading,
 		agentRunning,
 		streamingText,
 		usageData,
 		isLoggedIn,
+		changedFiles,
 		setAgentMode,
 		setApprovalMode,
 		setSelectedModel,
